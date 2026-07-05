@@ -21,6 +21,7 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
   const activeModal = useAppStore((s) => s.activeModal)
   const modalData = useAppStore((s) => s.modalData)
   const closeModal = useAppStore((s) => s.closeModal)
+  const openModal = useAppStore((s) => s.openModal)
   const addRepoPath = useAppStore((s) => s.addRepoPath)
   const scanNestedRepos = useAppStore((s) => s.scanNestedRepos)
   const cancelNestedRepoScan = useAppStore((s) => s.cancelNestedRepoScan)
@@ -351,6 +352,12 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
         onOpenCreateStep={() => {
           setCreateError(null)
           setStep('create')
+        }}
+        onOpenStructuredIteration={() => {
+          // Hand off from the derived-projection add flow to the structured
+          // iteration wizard; closing first keeps only one modal open.
+          closeModal()
+          openModal('structured-iteration')
         }}
         onOpenRemoteStep={handleOpenRemoteStep}
         onStopNestedScan={handleStopNestedScan}

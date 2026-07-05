@@ -29,6 +29,7 @@ function renderLocalStartStep(isSshLikely: boolean): string {
       onOpenCloneStep={vi.fn()}
       onOpenRemoteStep={vi.fn()}
       onOpenCreateStep={vi.fn()}
+      onOpenStructuredIteration={vi.fn()}
       onStopNestedScan={vi.fn()}
     />
   )
@@ -83,6 +84,7 @@ async function renderLocalStartStepDom(
           onOpenCloneStep={vi.fn()}
           onOpenRemoteStep={vi.fn()}
           onOpenCreateStep={vi.fn()}
+          onOpenStructuredIteration={vi.fn()}
           onStopNestedScan={vi.fn()}
         />
       </TooltipProvider>
@@ -111,7 +113,8 @@ function getActionTitles(isSshLikely: boolean): {
     onBrowse: vi.fn(),
     onOpenCloneStep: vi.fn(),
     onOpenRemoteStep: vi.fn(),
-    onOpenCreateStep: vi.fn()
+    onOpenCreateStep: vi.fn(),
+    onOpenStructuredIteration: vi.fn()
   })
 
   return {
@@ -130,7 +133,8 @@ function getHostAwareActionModel(): {
     onBrowse: vi.fn(),
     onOpenCloneStep: vi.fn(),
     onOpenRemoteStep: vi.fn(),
-    onOpenCreateStep: vi.fn()
+    onOpenCreateStep: vi.fn(),
+    onOpenStructuredIteration: vi.fn()
   })
   const createAction = secondaryActions.find((action) => action.kind === 'create')
 
@@ -151,7 +155,8 @@ function getRuntimeHostActionModel(): {
     onBrowse: vi.fn(),
     onOpenCloneStep: vi.fn(),
     onOpenRemoteStep: vi.fn(),
-    onOpenCreateStep: vi.fn()
+    onOpenCreateStep: vi.fn(),
+    onOpenStructuredIteration: vi.fn()
   })
 
   return {
@@ -183,7 +188,8 @@ describe('AddRepoLocalStartStep', () => {
     expect(titles.secondary).toEqual([
       'Clone from URL',
       'Project on SSH host',
-      'Create new project'
+      'Create new project',
+      'Structured iteration'
     ])
   })
 
@@ -203,14 +209,19 @@ describe('AddRepoLocalStartStep', () => {
     expect(titles.secondary).toEqual([
       'Project on SSH host',
       'Clone from URL',
-      'Create new project'
+      'Create new project',
+      'Structured iteration'
     ])
   })
 
   it('lets host-aware Add Project replace the separate remote row', () => {
     const model = getHostAwareActionModel()
 
-    expect(model.secondary).toEqual(['Clone from URL', 'Create new project'])
+    expect(model.secondary).toEqual([
+      'Clone from URL',
+      'Create new project',
+      'Structured iteration'
+    ])
     expect(model.createDisabled).toBe(false)
   })
 
@@ -219,6 +230,22 @@ describe('AddRepoLocalStartStep', () => {
 
     expect(model.primary).toBe('Browse folder')
     expect(model.description).toBe('Existing Git repository or folder on this host')
+  })
+
+  it('offers the structured iteration entry and fires its handler', () => {
+    const onOpenStructuredIteration = vi.fn()
+    const { secondaryActions } = getAddRepoLocalStartActions({
+      isSshLikely: false,
+      onBrowse: vi.fn(),
+      onOpenCloneStep: vi.fn(),
+      onOpenRemoteStep: vi.fn(),
+      onOpenCreateStep: vi.fn(),
+      onOpenStructuredIteration
+    })
+    const iteration = secondaryActions.find((action) => action.kind === 'iteration')
+    expect(iteration?.title).toBe('Structured iteration')
+    iteration?.onClick()
+    expect(onOpenStructuredIteration).toHaveBeenCalledOnce()
   })
 
   it('focuses Browse folder when the default Add Project step opens', async () => {

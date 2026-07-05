@@ -87,6 +87,8 @@ import {
   buildRows,
   getProjectGroupHeaderKey,
   getGroupKeysForWorktree,
+  isStructuredTopGroup,
+  isStructuredWorkspaceGroup,
   getLineageGroupKey
 } from './worktree-list-groups'
 import {
@@ -631,6 +633,8 @@ type VirtualizedWorktreeViewportProps = {
   handleRenameProjectGroup: (groupId: string, currentName: string) => void
   handleDeleteProjectGroup: (groupId: string, groupName: string) => void
   handleCreateFolderWorkspace: (projectGroup: ProjectGroup) => void
+  handleAddStructuredWorkspace: (group: ProjectGroup) => void
+  handleMountStructuredRepo: (group: ProjectGroup) => void
   activeModal: string
   pendingRevealWorktree: PendingSidebarWorktreeReveal | null
   pendingRevealSidebarRow: PendingSidebarRowReveal | null
@@ -1270,6 +1274,8 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
   handleRenameProjectGroup,
   handleDeleteProjectGroup,
   handleCreateFolderWorkspace,
+  handleAddStructuredWorkspace,
+  handleMountStructuredRepo,
   activeModal,
   pendingRevealWorktree,
   pendingRevealSidebarRow,
@@ -4394,8 +4400,86 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                       {isProjectGroupHeader &&
                       !row.repo &&
                       row.projectGroup &&
-                      'parentPath' in row.projectGroup &&
-                      row.projectGroup.parentPath ? (
+                      'createdFrom' in row.projectGroup &&
+                      isStructuredTopGroup(row.projectGroup) ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              data-repo-header-action=""
+                              className={REPO_HEADER_ACTION_BUTTON_CLASS}
+                              aria-label={translate(
+                                'auto.components.sidebar.WorktreeList.structuredAddWorkspace',
+                                'New workspace in {{value0}}',
+                                { value0: row.label }
+                              )}
+                              onKeyDown={stopRepoHeaderKeyboardToggle}
+                              onPointerDown={handleRepoHeaderActionPointerDown}
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                if (row.projectGroup && 'createdFrom' in row.projectGroup) {
+                                  handleAddStructuredWorkspace(row.projectGroup)
+                                }
+                              }}
+                            >
+                              <Plus className="size-3" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" sideOffset={6}>
+                            {translate(
+                              'auto.components.sidebar.WorktreeList.structuredAddWorkspace',
+                              'New workspace in {{value0}}',
+                              { value0: row.label }
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : isProjectGroupHeader &&
+                        !row.repo &&
+                        row.projectGroup &&
+                        'createdFrom' in row.projectGroup &&
+                        isStructuredWorkspaceGroup(row.projectGroup) ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              data-repo-header-action=""
+                              className={REPO_HEADER_ACTION_BUTTON_CLASS}
+                              aria-label={translate(
+                                'auto.components.sidebar.WorktreeList.structuredMountRepo',
+                                'Mount repository into {{value0}}',
+                                { value0: row.label }
+                              )}
+                              onKeyDown={stopRepoHeaderKeyboardToggle}
+                              onPointerDown={handleRepoHeaderActionPointerDown}
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                if (row.projectGroup && 'createdFrom' in row.projectGroup) {
+                                  handleMountStructuredRepo(row.projectGroup)
+                                }
+                              }}
+                            >
+                              <Plus className="size-3" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" sideOffset={6}>
+                            {translate(
+                              'auto.components.sidebar.WorktreeList.structuredMountRepo',
+                              'Mount repository into {{value0}}',
+                              { value0: row.label }
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : isProjectGroupHeader &&
+                        !row.repo &&
+                        row.projectGroup &&
+                        'parentPath' in row.projectGroup &&
+                        row.projectGroup.parentPath ? (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -6353,6 +6437,29 @@ const WorktreeList = React.memo(function WorktreeList({
     projectGroupDeleteDialog
   ])
 
+  // Structured project header +: reopen the wizard in add-workspace mode
+  // for this project (re-entry, not a plain folder workspace).
+  const handleAddStructuredWorkspace = useCallback(
+    (group: ProjectGroup) => {
+      openModal('structured-iteration', { project: group.name, startAt: 'workspace' })
+    },
+    [openModal]
+  )
+
+  // Structured workspace header +: reopen the wizard on the repos step to
+  // mount a git worktree into this workspace. Project = parent top group.
+  const handleMountStructuredRepo = useCallback(
+    (group: ProjectGroup) => {
+      const top = projectGroups.find((candidate) => candidate.id === group.parentGroupId)
+      openModal('structured-iteration', {
+        project: (top ?? group).name,
+        workspace: group.name,
+        startAt: 'repos'
+      })
+    },
+    [openModal, projectGroups]
+  )
+
   const handleCreateFolderWorkspace = useCallback(
     (projectGroup: ProjectGroup) => {
       if (!projectGroup.parentPath) {
@@ -6833,6 +6940,8 @@ const WorktreeList = React.memo(function WorktreeList({
         handleRenameProjectGroup={handleRenameProjectGroup}
         handleDeleteProjectGroup={handleDeleteProjectGroup}
         handleCreateFolderWorkspace={handleCreateFolderWorkspace}
+        handleAddStructuredWorkspace={handleAddStructuredWorkspace}
+        handleMountStructuredRepo={handleMountStructuredRepo}
         activeModal={activeModal}
         pendingRevealWorktree={pendingRevealWorktree}
         pendingRevealSidebarRow={pendingRevealSidebarRow}

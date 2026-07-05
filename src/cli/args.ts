@@ -24,6 +24,7 @@ export const BOOLEAN_FLAGS = new Set([
   'comments',
   'connect',
   'current',
+  'delete-branches',
   'dry-run',
   'enter',
   'focus',

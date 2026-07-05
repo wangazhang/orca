@@ -62,6 +62,7 @@ function renderStepContent(overrides: Partial<StepContentProps>): string {
     onBrowse: vi.fn(),
     onOpenCloneStep: vi.fn(),
     onOpenCreateStep: vi.fn(),
+    onOpenStructuredIteration: vi.fn(),
     onOpenRemoteStep: vi.fn(),
     onStopNestedScan: vi.fn(),
     onServerPathChange: vi.fn(),

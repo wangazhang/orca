@@ -675,6 +675,7 @@ import { getSshGitProvider, requireSshGitProvider } from '../providers/ssh-git-d
 import { detectRepoIconAndUpstream } from '../repo-icon-autodetect'
 import { enrichMissingRepoGitRemoteIdentities } from '../repo-git-remote-identity-enrichment'
 import { githubAvatarIcon } from '../../shared/repo-icon'
+import type { RepoIcon } from '../../shared/repo-icon'
 import type { ClaudeAccountService } from '../claude-accounts/service'
 import type { CodexAccountService } from '../codex-accounts/service'
 import type { RateLimitService } from '../rate-limits/service'
@@ -10013,7 +10014,15 @@ export class OrcaRuntimeService {
     })
   }
 
-  async addRepo(path: string, kind: 'git' | 'folder' = 'git'): Promise<Repo> {
+  async addRepo(
+    path: string,
+    kind: 'git' | 'folder' = 'git',
+    // Applied only when auto-detection finds no icon and the repo is newly
+    // created — lets a caller (e.g. structured-project registration) seed a
+    // domain-appropriate glyph instead of the generic Folder fallback, without
+    // overriding a detected GitHub avatar or a user's later choice.
+    defaultRepoIcon?: RepoIcon
+  ): Promise<Repo> {
     if (!this.store) {
       throw new Error('runtime_unavailable')
     }
@@ -10038,6 +10047,7 @@ export class OrcaRuntimeService {
       displayName: getRepoName(path),
       badgeColor: DEFAULT_REPO_BADGE_COLOR,
       ...detected,
+      ...(!detected.repoIcon && defaultRepoIcon ? { repoIcon: defaultRepoIcon } : {}),
       addedAt: Date.now(),
       kind,
       ...(kind === 'git'
@@ -10052,6 +10062,44 @@ export class OrcaRuntimeService {
     this.invalidateResolvedWorktreeCache()
     this.notifyReposChanged()
     return this.store.getRepo(repo.id) ?? repo
+  }
+
+  // Registers a source repo as an orca Repo (reusing addRepo's validation +
+  // dedupe) and returns its id, so a structured-project worktree can be keyed
+  // to it. Idempotent: an already-registered path returns the existing id.
+  async registerManagedRepo(source: string): Promise<string> {
+    // Structured src repos usually have no GitHub remote, so icon detection
+    // yields nothing and they would fall back to the Folder glyph — visually
+    // identical to the workspace's folder-overview node. Seed a Box icon (echoing
+    // the project's Boxes top-group glyph) so a repo reads as a repo, not a
+    // folder. addRepo only applies it on first creation, so a user's later icon
+    // choice is preserved across re-materialization.
+    const repo = await this.addRepo(source, 'git', { type: 'lucide', name: 'Box' })
+    // Backfill repos registered before this default existed (or added via a
+    // non-structured path): seed Box only when the icon is genuinely unset, so a
+    // user's chosen icon is never overwritten. addRepo already stamps new repos,
+    // so this only fires for pre-existing ones on re-materialization.
+    if (!repo.repoIcon) {
+      await this.updateRepo(repo.id, { repoIcon: { type: 'lucide', name: 'Box' } })
+    }
+    return repo.id
+  }
+
+  // Marks a structured-project worktree as orca-managed by persisting strong
+  // metadata (orcaCreatedAt) so the agent engine sees it. Thin pass-through to
+  // the store; the on-disk workspace.json stays the source of truth.
+  setStructuredWorktreeMeta(worktreeId: string, meta: Partial<WorktreeMeta>): void {
+    if (!this.store) {
+      throw new Error('runtime_unavailable')
+    }
+    this.store.setWorktreeMeta(worktreeId, meta)
+  }
+
+  // Reads one worktree's persisted meta (undefined if none). Used by materialize
+  // to check whether a structured worktree already carries the orca-managed
+  // marker before backfilling it.
+  getWorktreeMeta(worktreeId: string): WorktreeMeta | undefined {
+    return this.store?.getWorktreeMeta?.(worktreeId)
   }
 
   async createRepo(

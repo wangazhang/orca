@@ -55,6 +55,7 @@ type AddRepoDialogStepContentProps = {
   onBrowse: () => void
   onOpenCloneStep: () => void
   onOpenCreateStep: () => void
+  onOpenStructuredIteration: () => void
   onOpenRemoteStep: (targetId?: string | null) => void
   onStopNestedScan: () => void
   onServerPathChange: (path: string) => void
@@ -124,6 +125,7 @@ export function AddRepoDialogStepContent({
   onBrowse,
   onOpenCloneStep,
   onOpenCreateStep,
+  onOpenStructuredIteration,
   onOpenRemoteStep,
   onStopNestedScan,
   onServerPathChange,
@@ -164,6 +166,7 @@ export function AddRepoDialogStepContent({
         onOpenCloneStep={onOpenCloneStep}
         onOpenRemoteStep={onOpenRemoteStep}
         onOpenCreateStep={onOpenCreateStep}
+        onOpenStructuredIteration={onOpenStructuredIteration}
         onStopNestedScan={onStopNestedScan}
       />
     )

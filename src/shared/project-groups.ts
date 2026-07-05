@@ -72,7 +72,8 @@ export function normalizeProjectGroups(value: unknown): ProjectGroup[] {
       createdFrom:
         raw.createdFrom === 'manual' ||
         raw.createdFrom === 'folder-scan' ||
-        raw.createdFrom === 'migration'
+        raw.createdFrom === 'migration' ||
+        raw.createdFrom === 'structured'
           ? raw.createdFrom
           : 'manual',
       tabOrder:

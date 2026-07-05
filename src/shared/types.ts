@@ -287,7 +287,10 @@ export type Repo = {
   projectHostSetupMethod?: RepoProjectHostSetupMethod
 }
 
-export type ProjectGroupCreatedFrom = 'manual' | 'folder-scan' | 'migration'
+// 'structured' marks the top and workspace groups synthesized when a structured
+// project is materialized into orca records — the render layer keys per-workspace
+// grouping off this so normal groups stay on the unchanged code path.
+export type ProjectGroupCreatedFrom = 'manual' | 'folder-scan' | 'migration' | 'structured'
 
 export type ProjectGroup = {
   id: string

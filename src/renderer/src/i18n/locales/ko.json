@@ -4080,7 +4080,9 @@
           "hostDisconnected": "연결 끊김",
           "failedNestWorkspace": "워크스페이스를 중첩하지 못했습니다",
           "sidebarRowMissing": "대상이 더 이상 존재하지 않습니다",
-          "failedUnnestWorkspace": "Failed to unnest workspace"
+          "failedUnnestWorkspace": "Failed to unnest workspace",
+          "structuredAddWorkspace": "New workspace in {{value0}}",
+          "structuredMountRepo": "Mount repository into {{value0}}"
         },
         "WorktreeMetaDialog": {
           "3db0a2a593": "취소",
@@ -4143,7 +4145,9 @@
                   "sshCreateUnavailable": "아직 SSH 호스트에서는 사용할 수 없습니다.",
                   "sshBrowseTitle": "SSH 호스트에서 프로젝트 열기",
                   "sshBrowseDescription": "이 SSH 호스트의 기존 Git 리포지토리 또는 폴더",
-                  "runtimeBrowseDescription": "이 호스트의 기존 Git 리포지토리 또는 폴더"
+                  "runtimeBrowseDescription": "이 호스트의 기존 Git 리포지토리 또는 폴더",
+                  "structuredIterationTitle": "Structured iteration",
+                  "structuredIterationDescription": "Iteration root with docs, an isolated sandbox, and multiple repos"
                 }
               }
             }
@@ -4507,6 +4511,26 @@
           "importing": "가져오는 중...",
           "importSshConfig": "~/.ssh/config 가져오기",
           "sshPersistenceDefault": "이 호스트의 원격 터미널은 종료하거나 릴레이를 재설정할 때까지 계속 실행됩니다."
+        },
+        "NewStructuredIterationDialog": {
+          "finishTitle": "Structured iteration ready",
+          "projectTitle": "New structured iteration",
+          "workspaceTitle": "Create the first workspace",
+          "reposTitle": "Add repositories",
+          "projectDescription": "An on-disk project root with docs, an isolated sandbox, and multiple repos.",
+          "workspaceDescription": "A workspace is one iteration: its own sandbox ports and repo worktrees.",
+          "reposDescription": "Mount local Git repositories as worktrees on the workspace branch.",
+          "nameLabel": "Project name",
+          "servicesLabel": "Sandbox services",
+          "workspaceNameLabel": "Workspace name",
+          "reposEmpty": "No repositories added yet.",
+          "pickRepo": "Choose a local Git folder…",
+          "createProject": "Create project",
+          "createWorkspace": "Create workspace",
+          "finish": "Done",
+          "createProjectOnly": "Create project only",
+          "createAndAddWorkspace": "Create & add workspace",
+          "skipWorkspace": "Skip"
         }
       },
       "shared": {

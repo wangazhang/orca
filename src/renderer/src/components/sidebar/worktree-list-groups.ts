@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: sidebar row construction keeps every grouping mode in one pure module so reveal, virtualized rendering, and tests share the same flat row contract. */
-import { CircleX, FolderTree, List, Pin } from 'lucide-react'
+import { Boxes, CircleX, FolderTree, List, Pin } from 'lucide-react'
 import type React from 'react'
 import type {
   DetectedWorktree,
@@ -36,7 +36,11 @@ import { getRepoDisplayLabelsByPath } from '@/lib/repo-display-labels'
 import { translate } from '@/i18n/i18n'
 import { getExecutionHostLabel, getRepoExecutionHostId } from '../../../../shared/execution-host'
 import { parseWslUncPath } from '../../../../shared/wsl-paths'
-import { isWindowsAbsolutePathLike } from '../../../../shared/cross-platform-path'
+import {
+  getRuntimePathBasename,
+  isWindowsAbsolutePathLike,
+  relativePathInsideRoot
+} from '../../../../shared/cross-platform-path'
 
 export { branchName }
 
@@ -124,6 +128,45 @@ export type Row =
   | NewExternalWorktreesInboxRow
   | PendingCreationRow
   | FolderWorkspaceRow
+
+// ─── Structured projects ────────────────────────────────────────────
+// A structured project materializes to a top folder-backed group (parentGroupId
+// null, createdFrom 'structured') and per-workspace child groups. Its src repos
+// are a single shared orca Repo attached to the TOP group, so their worktrees
+// (one branch per workspace) are re-grouped by path here into the workspace
+// groups — orca can't split one Repo across groups otherwise. All checks key off
+// createdFrom==='structured' so normal groups stay on the unchanged code path.
+
+const STRUCTURED_REPO_SECTION_PREFIX = 'struct-repo'
+
+export function isStructuredTopGroup(group: ProjectGroup): boolean {
+  return group.createdFrom === 'structured' && !group.parentGroupId
+}
+
+// A structured workspace group is a nested child of a structured top group (one
+// per iteration). Its header + button mounts repos rather than creating a plain
+// folder workspace.
+export function isStructuredWorkspaceGroup(group: ProjectGroup): boolean {
+  return group.createdFrom === 'structured' && !!group.parentGroupId
+}
+
+// Key for a synthesized per-repo subsection inside a structured workspace group.
+// Includes the workspace group id so the same shared repo folds independently in
+// each workspace.
+function getStructuredRepoSectionKey(workspaceGroupId: string, repoId: string): string {
+  return `${STRUCTURED_REPO_SECTION_PREFIX}:${workspaceGroupId}:${repoId}`
+}
+
+// A worktree belongs to a structured workspace when its path sits under the
+// workspace directory's src/ folder (that is where mountRepoIntoWorkspace checks
+// it out). Returns the leaf repo id (the src/<repoId> folder name) or null.
+function structuredWorkspaceRepoIdFor(workspaceDir: string, worktreePath: string): string | null {
+  const relative = relativePathInsideRoot(workspaceDir, worktreePath)
+  if (relative === null || !relative.startsWith('src/')) {
+    return null
+  }
+  return getRuntimePathBasename(worktreePath) || null
+}
 
 function buildPendingCreationRow(
   creation: PendingCreationRef,
@@ -324,6 +367,14 @@ export const PR_GROUP_META: Record<
 export const PROJECT_GROUP_META = {
   tone: 'text-foreground',
   icon: FolderTree
+} as const
+
+// A structured project's top group reads as a distinct concept from a plain
+// folder group, so it gets its own glyph (Boxes) while workspace + normal groups
+// keep FolderTree.
+export const STRUCTURED_TOP_GROUP_META = {
+  tone: 'text-foreground',
+  icon: Boxes
 } as const
 
 export function getProjectGroupHeaderKey(groupId: string | null): string {
@@ -1164,9 +1215,23 @@ export function buildRows(
     return result
   }
 
+  // Structured shared repos are attached to their top group but must NOT render as
+  // a normal repo section there (their worktrees split per workspace by path
+  // below). Pull them out of the buckets and pool their worktrees; leaving them in
+  // would double-render (once here, once in the workspace group) or drop them into
+  // the ungrouped fallback. When there are no structured groups this is a no-op.
+  const structuredTopGroupIds = new Set(
+    projectGroups.filter(isStructuredTopGroup).map((group) => group.id)
+  )
+  const structuredWorktreePool: Worktree[] = []
+
   const groupByProjectGroupId = new Map<string | null, OrderedGroupEntry[]>()
   for (const entry of orderedGroups) {
     const repo = entry[1].repo
+    if (repo?.projectGroupId && structuredTopGroupIds.has(repo.projectGroupId)) {
+      structuredWorktreePool.push(...entry[1].items)
+      continue
+    }
     const projectGroupId = repo?.projectGroupId ?? null
     const list = groupByProjectGroupId.get(projectGroupId) ?? []
     list.push(entry)
@@ -1235,13 +1300,16 @@ export function buildRows(
     const repoEntries = sortRepoEntriesWithinGroup(groupByProjectGroupId.get(projectGroup.id) ?? [])
     const childGroups = childGroupsByParentId.get(projectGroup.id) ?? []
     const key = getProjectGroupHeaderKey(projectGroup.id)
+    const groupMeta = isStructuredTopGroup(projectGroup)
+      ? STRUCTURED_TOP_GROUP_META
+      : PROJECT_GROUP_META
     result.push({
       type: 'header',
       key,
       label: projectGroup.name,
       count: getProjectGroupSubtreeCount(projectGroup.id),
-      tone: PROJECT_GROUP_META.tone,
-      icon: PROJECT_GROUP_META.icon,
+      tone: groupMeta.tone,
+      icon: groupMeta.icon,
       projectGroup,
       projectGroupDepth: depth
     })
@@ -1256,7 +1324,40 @@ export function buildRows(
           groupDepth: depth + 1
         })
       }
-      appendOrderedGroups(withRepoSectionDisplayLabels(repoEntries), depth + 1)
+      // Structured workspace group: its src repos are the shared pool worktrees
+      // whose path sits under this workspace's src/. Synthesize one repo section
+      // per repo (workspace-scoped key so the same shared repo folds independently
+      // per workspace) and reuse the normal repo/worktree rendering.
+      if (projectGroup.createdFrom === 'structured' && projectGroup.parentGroupId !== null) {
+        const workspaceDir = projectGroup.parentPath
+        const itemsByRepoId = new Map<string, Worktree[]>()
+        if (workspaceDir) {
+          for (const worktree of structuredWorktreePool) {
+            if (structuredWorkspaceRepoIdFor(workspaceDir, worktree.path) === null) {
+              continue
+            }
+            const list = itemsByRepoId.get(worktree.repoId) ?? []
+            list.push(worktree)
+            itemsByRepoId.set(worktree.repoId, list)
+          }
+        }
+        const structuredEntries: OrderedGroupEntry[] = [...itemsByRepoId.entries()]
+          .map(
+            ([repoId, items]): OrderedGroupEntry => [
+              getStructuredRepoSectionKey(projectGroup.id, repoId),
+              {
+                label: getRuntimePathBasename(items[0]?.path ?? '') || repoId,
+                items,
+                repo: repoMap.get(repoId),
+                repoIds: new Set([repoId])
+              }
+            ]
+          )
+          .sort((left, right) => left[1].label.localeCompare(right[1].label))
+        appendOrderedGroups(structuredEntries, depth + 1)
+      } else {
+        appendOrderedGroups(withRepoSectionDisplayLabels(repoEntries), depth + 1)
+      }
       for (const childGroup of childGroups) {
         appendProjectGroup(childGroup, depth + 1)
       }
@@ -1352,5 +1453,28 @@ export function getGroupKeysForWorktree(
     const parentId = group.parentGroupId ?? null
     currentGroupId = parentId && groupsById.has(parentId) ? parentId : null
   }
+
+  // Structured shared repo: buildRows renders its worktrees inside a workspace
+  // child group (not the top group its Repo is attached to). Append the workspace
+  // group's header key and the synthesized struct-repo section key so reveal
+  // expands the right subtree and matches the row's sectionKey.
+  const topGroup = repo?.projectGroupId ? groupsById.get(repo.projectGroupId) : undefined
+  if (topGroup && isStructuredTopGroup(topGroup)) {
+    const workspaceGroup = projectGroups.find(
+      (group) =>
+        group.createdFrom === 'structured' &&
+        group.parentGroupId === topGroup.id &&
+        typeof group.parentPath === 'string' &&
+        structuredWorkspaceRepoIdFor(group.parentPath, worktree.path) !== null
+    )
+    if (workspaceGroup) {
+      return [
+        ...groupIds.map((id) => getProjectGroupHeaderKey(id)),
+        getProjectGroupHeaderKey(workspaceGroup.id),
+        getStructuredRepoSectionKey(workspaceGroup.id, worktree.repoId)
+      ]
+    }
+  }
+
   return [...groupIds.map((id) => getProjectGroupHeaderKey(id)), groupKey]
 }

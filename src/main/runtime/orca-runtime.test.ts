@@ -5043,6 +5043,60 @@ describe('OrcaRuntimeService', () => {
     }
   })
 
+  it('registerManagedRepo seeds a Box icon so structured repos differ from folder nodes', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'orca-runtime-managed-repo-'))
+    const repos: Record<string, unknown>[] = []
+    const runtimeStore = {
+      ...store,
+      getRepos: () => [...repos] as never,
+      addRepo: (repo: Record<string, unknown>) => {
+        repos.push(repo)
+      },
+      getRepo: (id: string) => repos.find((repo) => repo.id === id) as never
+    }
+    const runtime = new OrcaRuntimeService(runtimeStore as never)
+    try {
+      execFileSync('git', ['init'], { cwd: tempRoot, stdio: 'ignore' })
+      const repoId = await runtime.registerManagedRepo(tempRoot)
+      const stored = repos.find((repo) => repo.id === repoId)
+      // No git remote → detection finds no icon → Box seed instead of the Folder
+      // fallback that would collide with the workspace folder-overview node.
+      expect(stored?.repoIcon).toEqual({ type: 'lucide', name: 'Box' })
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('registerManagedRepo never overwrites an already-registered repo icon', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'orca-runtime-managed-repo-keep-'))
+    const chosenIcon = { type: 'lucide' as const, name: 'Palette' }
+    const repos: Record<string, unknown>[] = [
+      { id: 'existing-repo', path: tempRoot, kind: 'git', repoIcon: chosenIcon }
+    ]
+    const updateRepo = vi.fn()
+    const runtimeStore = {
+      ...store,
+      getRepos: () => [...repos] as never,
+      addRepo: (repo: Record<string, unknown>) => {
+        repos.push(repo)
+      },
+      getRepo: (id: string) => repos.find((repo) => repo.id === id) as never,
+      updateRepo
+    }
+    const runtime = new OrcaRuntimeService(runtimeStore as never)
+    try {
+      execFileSync('git', ['init'], { cwd: tempRoot, stdio: 'ignore' })
+      const repoId = await runtime.registerManagedRepo(tempRoot)
+      expect(repoId).toBe('existing-repo')
+      // addRepo returns the existing record; its user-chosen icon must survive and
+      // no backfill update should fire.
+      expect(repos.find((repo) => repo.id === 'existing-repo')?.repoIcon).toEqual(chosenIcon)
+      expect(updateRepo).not.toHaveBeenCalled()
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true })
+    }
+  })
+
   it('defaults runtime createRepo badgeColor to DEFAULT_REPO_BADGE_COLOR', async () => {
     const added: Record<string, unknown>[] = []
     const colorStore = {

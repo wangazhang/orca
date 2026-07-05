@@ -74,6 +74,7 @@ type AddRepoLocalStartStepProps = {
   onOpenCloneStep: () => void
   onOpenRemoteStep: () => void
   onOpenCreateStep: () => void
+  onOpenStructuredIteration: () => void
   onStopNestedScan: () => void
 }
 
@@ -92,6 +93,7 @@ export function AddRepoLocalStartStep({
   onOpenCloneStep,
   onOpenRemoteStep,
   onOpenCreateStep,
+  onOpenStructuredIteration,
   onStopNestedScan
 }: AddRepoLocalStartStepProps): React.JSX.Element {
   const browseActionRef = useRef<HTMLButtonElement | null>(null)
@@ -102,6 +104,7 @@ export function AddRepoLocalStartStep({
     onOpenCloneStep,
     onOpenRemoteStep,
     onOpenCreateStep,
+    onOpenStructuredIteration,
     showRemoteAction,
     canCreateProject,
     browseHostKind

@@ -72,6 +72,18 @@ describe('project-groups', () => {
     })
   })
 
+  it('preserves the structured createdFrom marker across persistence', () => {
+    // Why: materialize keys idempotency off createdFrom==='structured'; if the
+    // read-back normalizer downgraded it to 'manual', every restart would
+    // re-create the structured groups (duplicate project-group explosion).
+    const groups = normalizeProjectGroups([
+      { id: 's', name: 'Structured', tabOrder: 1, parentPath: '/p', createdFrom: 'structured' },
+      { id: 'u', name: 'Unknown', tabOrder: 2, createdFrom: 'bogus' }
+    ])
+    expect(groups.find((group) => group.id === 's')?.createdFrom).toBe('structured')
+    expect(groups.find((group) => group.id === 'u')?.createdFrom).toBe('manual')
+  })
+
   it('preserves normalized execution ownership for persisted groups', () => {
     const groups = normalizeProjectGroups([
       { id: 'runtime', name: 'Runtime', tabOrder: 1, executionHostId: 'runtime:env-1' },

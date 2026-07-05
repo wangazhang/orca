@@ -4080,7 +4080,9 @@
           "hostDisconnected": "已断开连接",
           "failedNestWorkspace": "无法嵌套工作区",
           "sidebarRowMissing": "目标不再存在",
-          "failedUnnestWorkspace": "Failed to unnest workspace"
+          "failedUnnestWorkspace": "Failed to unnest workspace",
+          "structuredAddWorkspace": "在 {{value0}} 中新建工作区",
+          "structuredMountRepo": "将仓库挂载到 {{value0}}"
         },
         "WorktreeMetaDialog": {
           "3db0a2a593": "取消",
@@ -4143,7 +4145,9 @@
                   "sshCreateUnavailable": "SSH 主机暂不可用",
                   "sshBrowseTitle": "在 SSH 主机上打开项目",
                   "sshBrowseDescription": "此 SSH 主机上的现有 Git 仓库或文件夹",
-                  "runtimeBrowseDescription": "此主机上的现有 Git 仓库或文件夹"
+                  "runtimeBrowseDescription": "此主机上的现有 Git 仓库或文件夹",
+                  "structuredIterationTitle": "结构化迭代",
+                  "structuredIterationDescription": "含文档、隔离沙箱与多个仓库的迭代工作根"
                 }
               }
             }
@@ -4507,6 +4511,26 @@
           "importing": "正在导入...",
           "importSshConfig": "导入 ~/.ssh/config",
           "sshPersistenceDefault": "此主机上的远程终端会保持运行，直到你结束它们或重置中继。"
+        },
+        "NewStructuredIterationDialog": {
+          "finishTitle": "结构化迭代已就绪",
+          "projectTitle": "新建结构化迭代",
+          "workspaceTitle": "创建首个工作空间",
+          "reposTitle": "添加仓库",
+          "projectDescription": "一个物理项目根：含文档、隔离沙箱与多个仓库。",
+          "workspaceDescription": "工作空间即一次迭代：拥有独立的沙箱端口与仓库 worktree。",
+          "reposDescription": "把本地 Git 仓库以 worktree 挂到工作空间分支上。",
+          "nameLabel": "项目名称",
+          "servicesLabel": "沙箱服务",
+          "workspaceNameLabel": "工作空间名称",
+          "reposEmpty": "尚未添加仓库。",
+          "pickRepo": "选择本地 Git 目录…",
+          "createProject": "创建项目",
+          "createWorkspace": "创建工作空间",
+          "finish": "完成",
+          "createProjectOnly": "仅创建项目",
+          "createAndAddWorkspace": "创建并添加工作空间",
+          "skipWorkspace": "跳过"
         }
       },
       "shared": {

@@ -4122,7 +4122,9 @@
           "groupDeleteFailedDesc": "Something went wrong while deleting the group. No projects were removed.",
           "failedNestWorkspace": "Failed to nest workspace",
           "sidebarRowMissing": "Target no longer exists",
-          "failedUnnestWorkspace": "Failed to unnest workspace"
+          "failedUnnestWorkspace": "Failed to unnest workspace",
+          "structuredAddWorkspace": "New workspace in {{value0}}",
+          "structuredMountRepo": "Mount repository into {{value0}}"
         },
         "WorktreeMetaDialog": {
           "3db0a2a593": "Cancel",
@@ -4185,7 +4187,9 @@
                   "2281fdc8c7": "Browse folder",
                   "sshBrowseTitle": "Open project on SSH host",
                   "sshBrowseDescription": "Existing Git repository or folder on this SSH host",
-                  "runtimeBrowseDescription": "Existing Git repository or folder on this host"
+                  "runtimeBrowseDescription": "Existing Git repository or folder on this host",
+                  "structuredIterationTitle": "Structured iteration",
+                  "structuredIterationDescription": "Iteration root with docs, an isolated sandbox, and multiple repos"
                 }
               }
             }
@@ -4507,6 +4511,26 @@
           "sshImportFailed": "Failed to import SSH config.",
           "importing": "Importing...",
           "importSshConfig": "Import ~/.ssh/config"
+        },
+        "NewStructuredIterationDialog": {
+          "finishTitle": "Structured iteration ready",
+          "projectTitle": "New structured iteration",
+          "workspaceTitle": "Create the first workspace",
+          "reposTitle": "Add repositories",
+          "projectDescription": "An on-disk project root with docs, an isolated sandbox, and multiple repos.",
+          "workspaceDescription": "A workspace is one iteration: its own sandbox ports and repo worktrees.",
+          "reposDescription": "Mount local Git repositories as worktrees on the workspace branch.",
+          "nameLabel": "Project name",
+          "servicesLabel": "Sandbox services",
+          "workspaceNameLabel": "Workspace name",
+          "reposEmpty": "No repositories added yet.",
+          "pickRepo": "Choose a local Git folder…",
+          "createProject": "Create project",
+          "createWorkspace": "Create workspace",
+          "finish": "Done",
+          "createProjectOnly": "Create project only",
+          "createAndAddWorkspace": "Create & add workspace",
+          "skipWorkspace": "Skip"
         }
       },
       "shared": {

@@ -21,12 +21,38 @@ vi.mock('./runner', () => ({
 import {
   addSparseWorktree,
   addWorktree,
+  getLocalBranchHead,
   listWorktreeGraph,
   listWorktrees,
   moveWorktree,
   parseWorktreeList,
+  pruneWorktrees,
   removeWorktree
 } from './worktree'
+
+describe('pruneWorktrees / getLocalBranchHead', () => {
+  beforeEach(() => {
+    gitExecFileAsyncMock.mockReset()
+  })
+  afterEach(() => {
+    gitExecFileAsyncMock.mockReset()
+  })
+
+  it('pruneWorktrees issues `git worktree prune`', async () => {
+    gitExecFileAsyncMock.mockResolvedValueOnce({ stdout: '' })
+    await pruneWorktrees('/repo')
+    expect(gitExecFileAsyncMock).toHaveBeenCalledWith(['worktree', 'prune'], { cwd: '/repo' })
+  })
+
+  it('getLocalBranchHead returns the resolved tip, or null when absent', async () => {
+    gitExecFileAsyncMock.mockResolvedValueOnce({ stdout: 'deadbeef\n' })
+    await expect(getLocalBranchHead('/repo', 'iter1')).resolves.toBe('deadbeef')
+    gitExecFileAsyncMock.mockRejectedValueOnce(
+      Object.assign(new Error('unknown revision'), { code: 128 })
+    )
+    await expect(getLocalBranchHead('/repo', 'missing')).resolves.toBeNull()
+  })
+})
 
 describe('listWorktrees in-flight sharing', () => {
   beforeEach(() => {

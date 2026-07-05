@@ -3,6 +3,7 @@ import { RuntimeClientError } from './runtime-client'
 import { CORE_HANDLERS } from './handlers/core'
 import { AUTOMATION_HANDLERS } from './handlers/automations'
 import { PROJECT_HANDLERS } from './handlers/project'
+import { ITERATION_HANDLERS } from './handlers/iteration'
 import { REPO_HANDLERS } from './handlers/repo'
 import { WORKTREE_HANDLERS } from './handlers/worktree'
 import { FILE_HANDLERS } from './handlers/file'
@@ -40,6 +41,7 @@ function buildHandlers(): Map<string, CommandHandler> {
     CORE_HANDLERS,
     AUTOMATION_HANDLERS,
     PROJECT_HANDLERS,
+    ITERATION_HANDLERS,
     REPO_HANDLERS,
     WORKTREE_HANDLERS,
     FILE_HANDLERS,

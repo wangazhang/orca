@@ -12,6 +12,7 @@ import {
   getLineageGroupKey,
   getLineageRenderInfo,
   getPRGroupKey,
+  getProjectGroupHeaderKey,
   type PendingCreationRef
 } from './worktree-list-groups'
 import {
@@ -3293,5 +3294,163 @@ describe('buildRows pending creations', () => {
     )
 
     expect(rows[0]).toMatchObject({ type: 'pending-creation', creationId: 'c1' })
+  })
+})
+
+describe('buildRows — structured projects', () => {
+  // A shared source repo (one orca Repo) with two worktrees, one per workspace,
+  // each checked out under <wsDir>/src/mrs — the structured layout.
+  const structuredRepo: Repo = {
+    id: 'repo-mrs',
+    path: '/src/mrs',
+    displayName: 'mrs',
+    badgeColor: '#222222',
+    addedAt: 0,
+    projectGroupId: 'top'
+  }
+  const structuredRepoMap = new Map([[structuredRepo.id, structuredRepo]])
+  const wt1: Worktree = {
+    ...worktree,
+    id: 'repo-mrs::/root/penguin-x/workspace-1/src/mrs',
+    repoId: structuredRepo.id,
+    path: '/root/penguin-x/workspace-1/src/mrs',
+    branch: 'refs/heads/workspace-1',
+    displayName: 'workspace-1'
+  }
+  const wt2: Worktree = {
+    ...worktree,
+    id: 'repo-mrs::/root/penguin-x/workspace-2/src/mrs',
+    repoId: structuredRepo.id,
+    path: '/root/penguin-x/workspace-2/src/mrs',
+    branch: 'refs/heads/workspace-2',
+    displayName: 'workspace-2'
+  }
+  const topGroup: ProjectGroup = {
+    id: 'top',
+    name: 'penguin-x',
+    parentPath: '/root/penguin-x',
+    parentGroupId: null,
+    createdFrom: 'structured',
+    tabOrder: 0,
+    isCollapsed: false,
+    color: null,
+    createdAt: 0,
+    updatedAt: 0
+  }
+  const ws1Group: ProjectGroup = {
+    ...topGroup,
+    id: 'ws1',
+    name: 'workspace-1',
+    parentPath: '/root/penguin-x/workspace-1',
+    parentGroupId: 'top'
+  }
+  const ws2Group: ProjectGroup = {
+    ...topGroup,
+    id: 'ws2',
+    name: 'workspace-2',
+    parentPath: '/root/penguin-x/workspace-2',
+    parentGroupId: 'top'
+  }
+  const structuredGroups = [topGroup, ws1Group, ws2Group]
+
+  function buildStructuredRows(collapsed: Set<string> = new Set()): ReturnType<typeof buildRows> {
+    return buildRows(
+      'repo',
+      [wt1, wt2],
+      structuredRepoMap,
+      null,
+      collapsed,
+      undefined,
+      undefined,
+      'manual',
+      {},
+      undefined,
+      false,
+      undefined,
+      structuredGroups
+    )
+  }
+
+  it('renders one workspace subgroup per workspace, each with only its own branch worktree, and no ungrouped duplicate', () => {
+    const rows = buildStructuredRows()
+
+    // The shared repo must NOT appear as its own top-level/ungrouped repo header.
+    const structRepoHeaderKeys = rows
+      .filter((row) => row.type === 'header' && row.key.startsWith('struct-repo:'))
+      .map((row) => (row.type === 'header' ? row.key : ''))
+    expect(structRepoHeaderKeys).toHaveLength(2)
+    expect(structRepoHeaderKeys.sort()).toEqual([
+      'struct-repo:ws1:repo-mrs',
+      'struct-repo:ws2:repo-mrs'
+    ])
+
+    // Each worktree appears exactly once, under its own workspace section.
+    const itemRows = rows.filter((row) => row.type === 'item')
+    expect(itemRows).toHaveLength(2)
+    const ws1Item = itemRows.find((row) => row.type === 'item' && row.worktree.id === wt1.id)
+    const ws2Item = itemRows.find((row) => row.type === 'item' && row.worktree.id === wt2.id)
+    expect(ws1Item?.type === 'item' && ws1Item.sectionKey).toBe('struct-repo:ws1:repo-mrs')
+    expect(ws2Item?.type === 'item' && ws2Item.sectionKey).toBe('struct-repo:ws2:repo-mrs')
+  })
+
+  it('collapsing a workspace group hides its struct-repo sections and worktrees', () => {
+    const rows = buildStructuredRows(new Set([getProjectGroupHeaderKey('ws1')]))
+    // ws1's subtree is hidden; ws2 still shows its worktree.
+    expect(
+      rows.some((row) => row.type === 'header' && row.key === 'struct-repo:ws1:repo-mrs')
+    ).toBe(false)
+    expect(rows.some((row) => row.type === 'item' && row.worktree.id === wt1.id)).toBe(false)
+    expect(rows.some((row) => row.type === 'item' && row.worktree.id === wt2.id)).toBe(true)
+  })
+
+  it('collapsing a struct-repo section hides just that worktree', () => {
+    const rows = buildStructuredRows(new Set(['struct-repo:ws1:repo-mrs']))
+    expect(
+      rows.some((row) => row.type === 'header' && row.key === 'struct-repo:ws1:repo-mrs')
+    ).toBe(true)
+    expect(rows.some((row) => row.type === 'item' && row.worktree.id === wt1.id)).toBe(false)
+    expect(rows.some((row) => row.type === 'item' && row.worktree.id === wt2.id)).toBe(true)
+  })
+
+  it('getGroupKeysForWorktree returns the workspace group and struct-repo keys for reveal', () => {
+    const keys = getGroupKeysForWorktree(
+      'repo',
+      wt1,
+      structuredRepoMap,
+      null,
+      undefined,
+      undefined,
+      structuredGroups
+    )
+    expect(keys).toContain(getProjectGroupHeaderKey('top'))
+    expect(keys).toContain(getProjectGroupHeaderKey('ws1'))
+    expect(keys).toContain('struct-repo:ws1:repo-mrs')
+    // Must not leak the sibling workspace's key.
+    expect(keys).not.toContain('struct-repo:ws2:repo-mrs')
+  })
+
+  it('leaves a normal (non-structured) project group on the unchanged code path', () => {
+    const normalGroup: ProjectGroup = { ...topGroup, id: 'n', createdFrom: 'manual' }
+    const normalRepo: Repo = { ...repo, projectGroupId: 'n' }
+    const rows = buildRows(
+      'repo',
+      [{ ...worktree, repoId: normalRepo.id }],
+      new Map([[normalRepo.id, normalRepo]]),
+      null,
+      new Set(),
+      undefined,
+      undefined,
+      'manual',
+      {},
+      undefined,
+      false,
+      undefined,
+      [normalGroup]
+    )
+    // No structured sections; the repo renders as a normal repo:<id> section.
+    expect(rows.some((row) => row.type === 'header' && row.key.startsWith('struct-repo:'))).toBe(
+      false
+    )
+    expect(rows.some((row) => row.type === 'item')).toBe(true)
   })
 })

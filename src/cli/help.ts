@@ -41,6 +41,13 @@ Projects:
   project setup-update      Update project host setup metadata
   project setup-delete      Remove a project host setup
 
+Iterations:
+  iteration create          Create a structured project (physical root + project.json)
+  iteration workspace create  Create an isolated workspace (iteration) under a project
+  iteration workspace add-repo Mount a source repo into a workspace as a git worktree
+  iteration list            List structured projects under ~/orca/projects
+  iteration delete          Delete a structured project (root, records, optional branches)
+
 Repos:
   repo list                 List repos registered in Orca
   repo add                  Add a project to Orca by filesystem path

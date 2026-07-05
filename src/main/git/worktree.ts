@@ -800,6 +800,56 @@ async function refreshLocalBaseRefForWorktreeCreate(
  * `push.autoSetupRemote=true` to the repo's shared config. Config writes are
  * best-effort and warn-only. See body comments below for the full rationale.
  */
+// Reports whether a local branch already exists in the repo. Callers that create
+// a worktree with `-b` (a new branch) use this to fall back to checking out the
+// existing branch instead of failing with "a branch named X already exists".
+export async function localBranchExists(
+  repoPath: string,
+  branch: string,
+  options: GitWorktreeExecOptions = {}
+): Promise<boolean> {
+  try {
+    await gitExecFileAsync(
+      ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`],
+      gitExecOptions(repoPath, options)
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Drops stale `git worktree` admin records (linked worktrees whose working dir
+// was removed out-of-band, e.g. a deleted structured project). Needed before
+// deleting a leftover branch: git still reports the branch as "checked out" in
+// the dangling worktree entry and refuses `-d`/`-D` until the record is pruned.
+export async function pruneWorktrees(
+  repoPath: string,
+  options: GitWorktreeExecOptions = {}
+): Promise<void> {
+  await gitExecFileAsync(['worktree', 'prune'], gitExecOptions(repoPath, options))
+}
+
+// Resolves a local branch's tip commit (null if the branch is absent). Used to
+// feed forceDeleteLocalBranch its required CAS `expectedHead` when cleaning up a
+// leftover workspace branch.
+export async function getLocalBranchHead(
+  repoPath: string,
+  branch: string,
+  options: GitWorktreeExecOptions = {}
+): Promise<string | null> {
+  try {
+    const { stdout } = await gitExecFileAsync(
+      ['rev-parse', '--verify', `refs/heads/${branch}`],
+      gitExecOptions(repoPath, options)
+    )
+    const head = stdout.trim()
+    return head.length > 0 ? head : null
+  } catch {
+    return null
+  }
+}
+
 export async function addWorktree(
   repoPath: string,
   worktreePath: string,
@@ -1149,7 +1199,7 @@ async function deleteLocalBranchAfterWorktreeRemoval(
   try {
     // Why: `branch -d` is the cheap live-checkout guard. Only pay for
     // `worktree prune` when a stale admin record may be the thing blocking it.
-    await gitExecFileAsync(['worktree', 'prune'], gitExecOptions(repoPath, options))
+    await pruneWorktrees(repoPath, options)
   } catch (error) {
     console.warn(`[git] Failed to prune worktrees before deleting branch "${branchName}"`, error)
     return 'checked-out'

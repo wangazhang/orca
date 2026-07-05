@@ -76,6 +76,7 @@ import {
 } from '@/lib/floating-workspace-terminal-actions'
 import { createFloatingWorkspaceTourInteractionSnapshot } from '@/lib/floating-workspace-tour-interaction-snapshot'
 import { requestScrollToCurrentWorkspaceRevealAndRename } from '@/lib/scroll-to-current-workspace-status'
+import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import { OPEN_WORKSPACE_BOARD_EVENT } from './components/sidebar/useWorkspaceBoardPanel'
 import { WorkspacePortScanner } from './components/ports/WorkspacePortScanner'
 import { CrashReportDialog } from './components/crash-report/CrashReportDialog'
@@ -302,6 +303,9 @@ const AddProjectFromFolderDialog = lazy(
   () => import('./components/sidebar/AddProjectFromFolderDialog')
 )
 const ProjectAddedDialog = lazy(() => import('./components/sidebar/ProjectAddedDialog'))
+const NewStructuredIterationDialog = lazy(
+  () => import('./components/sidebar/NewStructuredIterationDialog')
+)
 const DeleteWorktreeDialog = lazy(() => import('./components/sidebar/DeleteWorktreeDialog'))
 const DictationController = lazy(() =>
   import('./components/dictation/DictationController').then((module) => ({
@@ -874,6 +878,25 @@ function App(): React.JSX.Element {
           window.api.onboarding.get()
         )
         onboardingPromise.catch(() => {})
+        // Why: project any on-disk structured projects into orca's native records
+        // (ProjectGroup + FolderWorkspace + registered repos) BEFORE the fetches
+        // below, so the sidebar shows them on cold start. Idempotent + fail-soft:
+        // a missing/malformed structured projects dir must not block startup.
+        await timeRendererStartupStep('materialize-structured', () =>
+          callRuntimeRpc({ kind: 'local' }, 'iteration.materializeAll', undefined, {
+            timeoutMs: 30_000
+          }).catch(() => {})
+        )
+        // Why: the delete-side dual of materialize — a structured project deleted
+        // on disk (its dir removed) leaves orphan ProjectGroup/FolderWorkspace/repo
+        // records; reconcile drops them so the sidebar doesn't show empty shells.
+        // Runs right after materialize so create-then-remove converges to disk
+        // truth in one cold-start pass. Idempotent + fail-soft.
+        await timeRendererStartupStep('reconcile-structured', () =>
+          callRuntimeRpc({ kind: 'local' }, 'iteration.reconcileAll', undefined, {
+            timeoutMs: 30_000
+          }).catch(() => {})
+        )
         // Why: load local + every configured runtime environment (not just the
         // active one) so a cold start that restored a remote workspace doesn't
         // hide local repos. The sidebar "All hosts" scope then shows them all.
@@ -2472,6 +2495,16 @@ function App(): React.JSX.Element {
                   compact
                 >
                   <AddProjectFromFolderDialog />
+                </RecoverableRenderErrorBoundary>
+              ) : null}
+              {activeModal === 'structured-iteration' ? (
+                <RecoverableRenderErrorBoundary
+                  boundaryId="modal.structured-iteration"
+                  surface="modal"
+                  resetKey
+                  compact
+                >
+                  <NewStructuredIterationDialog />
                 </RecoverableRenderErrorBoundary>
               ) : null}
               {activeModal === 'project-added' ? (
