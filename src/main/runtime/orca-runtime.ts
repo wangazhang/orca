@@ -46,6 +46,8 @@ import { createHash, randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises'
+import { resolveWorktreeCreateBase } from '../worktree-create-base'
+import { resolveWorktreeAddBaseRef } from '../../shared/worktree-base-ref'
 import { OrchestrationDb } from './orchestration/db'
 import { formatMessagesForInjection } from './orchestration/formatter'
 import type {
@@ -186,7 +188,11 @@ import {
   resolveTuiAgentLaunchArgs,
   resolveTuiAgentLaunchEnv
 } from '../../shared/tui-agent-launch-defaults'
-import { isTuiAgent, TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
+import {
+  getTuiAgentLaunchCommand,
+  isTuiAgent,
+  TUI_AGENT_CONFIG
+} from '../../shared/tui-agent-config'
 import { createDraftPasteReadyScanner } from '../../shared/draft-paste-ready-scanner'
 import { detectInstalledAgentsWithShellPathHydration, detectRemoteAgents } from '../ipc/preflight'
 import {
@@ -577,7 +583,8 @@ import {
   getRemoteDrift,
   getRecentDriftSubjects
 } from '../git/repo'
-import { hasLocalCommitObject } from '../git/commit-object-ref'
+import { hasCommitObjectViaGitExec } from '../git/commit-object-ref'
+import { hasWorktreeBaseCommitRef } from '../git/worktree-base-ref-probe'
 import { resolveLocalGitUsername } from '../git/git-username'
 import {
   listWorktrees,
@@ -790,6 +797,8 @@ type RuntimeStore = {
     githubProjects?: GlobalSettings['githubProjects']
     experimentalNewWorktreeCardStyle?: GlobalSettings['experimentalNewWorktreeCardStyle']
     compactWorktreeCards?: GlobalSettings['compactWorktreeCards']
+    minimaxGroupId?: GlobalSettings['minimaxGroupId']
+    minimaxUsageModels?: GlobalSettings['minimaxUsageModels']
     gitlabProjects?: GlobalSettings['gitlabProjects']
     experimentalWorktreeSymlinks?: boolean
     mobileAutoRestoreFitMs?: number | null
@@ -945,6 +954,32 @@ type RuntimePtyWorktreeRecord = {
   waitBlockedAt: number | null
 }
 
+type TerminalCreateOptions = {
+  command?: string
+  claudeAgentTeamsSourceCommand?: string
+  cwd?: string
+  env?: Record<string, string>
+  launchConfig?: WorktreeStartupLaunch['launchConfig']
+  launchToken?: string
+  launchAgent?: TuiAgent
+  startupCommandDelivery?: WorktreeStartupLaunch['startupCommandDelivery']
+  telemetry?: WorktreeStartupLaunch['telemetry']
+  title?: string
+  focus?: boolean
+  rendererBacked?: boolean
+  activate?: boolean
+  presentation?: RuntimeTerminalPresentation
+  tabId?: string
+  leafId?: string
+  sessionId?: string
+  persistHostSessionBinding?: boolean
+  // Why: the headless mobile-session create publishes its own authoritative
+  // snapshot (with the correct target group) right after spawn. Skip the
+  // intermediate pty-backed publish so the new tab doesn't briefly flash in
+  // the wrong (active) group before the corrected snapshot lands.
+  deferMobileSessionPublish?: boolean
+}
+
 type PtyForegroundAgentRefresh = {
   promise: Promise<boolean>
   startedAfterTitleObservation: number
@@ -959,6 +994,44 @@ function copySleepingAgentLaunchConfig(
     agentArgs: config.agentArgs,
     agentEnv: { ...config.agentEnv }
   }
+}
+
+function normalizeAgentLaunchCommandForMatch(command: string): string {
+  return command.trim().replace(/\s+/g, ' ')
+}
+
+function resolveBareAgentLaunchCommand(args: {
+  command: string | undefined
+  settings: {
+    agentCmdOverrides?: Partial<Record<TuiAgent, string>> | null
+    disabledTuiAgents?: Iterable<unknown> | null
+  }
+  platform: NodeJS.Platform
+  isRemote: boolean
+}): TuiAgent | null {
+  const command = args.command ? normalizeAgentLaunchCommandForMatch(args.command) : ''
+  if (!command) {
+    return null
+  }
+
+  const cmdOverrides = args.settings.agentCmdOverrides ?? {}
+  for (const agent of Object.keys(TUI_AGENT_CONFIG) as TuiAgent[]) {
+    if (!isTuiAgentEnabled(agent, args.settings.disabledTuiAgents)) {
+      continue
+    }
+    const override = cmdOverrides[agent]?.trim()
+    const defaultLaunchCommand = getTuiAgentLaunchCommand(TUI_AGENT_CONFIG[agent], args.platform, {
+      isRemote: args.isRemote
+    })
+    const launchCommands = override ? [defaultLaunchCommand, override] : [defaultLaunchCommand]
+    if (
+      launchCommands.some((candidate) => command === normalizeAgentLaunchCommandForMatch(candidate))
+    ) {
+      return agent
+    }
+  }
+
+  return null
 }
 
 function inferCapturedClaudeAgentTeamsMode(
@@ -1896,6 +1969,26 @@ type LayoutQueueEntry = {
   }[]
 }
 
+async function hasLocalWorktreeBaseRef(
+  repoPath: string,
+  baseRef: string,
+  options: { wslDistro?: string } = {}
+): Promise<boolean> {
+  const refExists = (qualifiedRef: string) =>
+    hasWorktreeBaseCommitRef(repoPath, qualifiedRef, options)
+  const resolvedBaseRef = await resolveWorktreeAddBaseRef(baseRef, refExists)
+  if (resolvedBaseRef !== baseRef) {
+    return true
+  }
+  if (baseRef.startsWith('refs/')) {
+    return refExists(baseRef)
+  }
+  return hasCommitObjectViaGitExec(
+    (gitArgs) => gitExecFileAsync(gitArgs, { cwd: repoPath, ...options }),
+    baseRef
+  )
+}
+
 export class OrcaRuntimeService {
   private readonly runtimeId = randomUUID()
   private readonly startedAt = Date.now()
@@ -2305,6 +2398,8 @@ export class OrcaRuntimeService {
     | 'githubProjects'
     | 'experimentalNewWorktreeCardStyle'
     | 'compactWorktreeCards'
+    | 'minimaxGroupId'
+    | 'minimaxUsageModels'
   > {
     if (!this.store?.getSettings) {
       throw new Error('runtime_unavailable')
@@ -2324,7 +2419,9 @@ export class OrcaRuntimeService {
       defaultLinearTeamSelection: settings.defaultLinearTeamSelection ?? null,
       githubProjects: settings.githubProjects,
       experimentalNewWorktreeCardStyle: settings.experimentalNewWorktreeCardStyle === true,
-      compactWorktreeCards: settings.compactWorktreeCards === true
+      compactWorktreeCards: settings.compactWorktreeCards === true,
+      minimaxGroupId: settings.minimaxGroupId ?? '',
+      minimaxUsageModels: settings.minimaxUsageModels ?? 'general'
     }
   }
 
@@ -2344,6 +2441,8 @@ export class OrcaRuntimeService {
       | 'githubProjects'
       | 'experimentalNewWorktreeCardStyle'
       | 'compactWorktreeCards'
+      | 'minimaxGroupId'
+      | 'minimaxUsageModels'
     >
   ): Pick<
     GlobalSettings,
@@ -2361,6 +2460,8 @@ export class OrcaRuntimeService {
     | 'githubProjects'
     | 'experimentalNewWorktreeCardStyle'
     | 'compactWorktreeCards'
+    | 'minimaxGroupId'
+    | 'minimaxUsageModels'
   > {
     if (!this.store?.getSettings || !this.store.updateSettings) {
       throw new Error('runtime_unavailable')
@@ -5855,7 +5956,9 @@ export class OrcaRuntimeService {
     })
   }
 
-  private async clearHeadlessTerminalBuffer(ptyId: string): Promise<void> {
+  // Public: desktop-initiated clears (ipc/pty.ts) must also drop this mobile
+  // mirror or a resubscribing mobile client resurrects the cleared scrollback.
+  async clearHeadlessTerminalBuffer(ptyId: string): Promise<void> {
     const state = this.headlessTerminals.get(ptyId)
     if (!state) {
       return
@@ -12972,12 +13075,42 @@ export class OrcaRuntimeService {
     let effectiveSanitizedName = sanitizedName
     const username = await resolveLocalGitUsername(repo.path)
 
-    const baseBranch =
-      args.baseBranch ||
-      repo.worktreeBaseRef ||
-      (hasLocalWorktreeGitOptions
-        ? await resolveDefaultBaseRefViaExec((argv) => gitExecFileAsync(argv, localGitExecOptions))
-        : getDefaultBaseRef(repo.path))
+    const baseBranch = await resolveWorktreeCreateBase({
+      requestedBaseBranch: args.baseBranch,
+      repoWorktreeBaseRef: repo.worktreeBaseRef,
+      resolveDefaultBaseRef: () =>
+        hasLocalWorktreeGitOptions
+          ? resolveDefaultBaseRefViaExec((argv) => gitExecFileAsync(argv, localGitExecOptions))
+          : Promise.resolve(getDefaultBaseRef(repo.path)),
+      isBaseUsable: async (baseBranchCandidate) => {
+        const remoteTrackingBase = await this.resolveRemoteTrackingBase(
+          repo.path,
+          baseBranchCandidate,
+          ...localWorktreeGitOptionArgs
+        )
+        if (remoteTrackingBase) {
+          if (
+            await this.hasRemoteTrackingRef(
+              repo.path,
+              remoteTrackingBase,
+              ...localWorktreeGitOptionArgs
+            )
+          ) {
+            return true
+          }
+          return hasLocalWorktreeBaseRef(
+            repo.path,
+            baseBranchCandidate,
+            hasLocalWorktreeGitOptions ? localWorktreeGitOptions : {}
+          )
+        }
+        return hasLocalWorktreeBaseRef(
+          repo.path,
+          baseBranchCandidate,
+          hasLocalWorktreeGitOptions ? localWorktreeGitOptions : {}
+        )
+      }
+    })
     if (!baseBranch) {
       // Why: getDefaultBaseRef returns null when no suitable ref exists.
       // Don't fabricate 'origin/main' — passing it to addWorktree would
@@ -13108,44 +13241,61 @@ export class OrcaRuntimeService {
         `Could not find an available worktree path for "${sanitizedName}". Pick a different worktree name.`
       )
     }
-    const remoteTrackingBase = await this.resolveRemoteTrackingBase(
+    let remoteTrackingBase = await this.resolveRemoteTrackingBase(
       repo.path,
       baseBranch,
       ...localWorktreeGitOptionArgs
     )
     if (remoteTrackingBase) {
-      const hadLocalBaseRef = await this.hasRemoteTrackingRef(
+      const hadRemoteTrackingBaseRef = await this.hasRemoteTrackingRef(
         repo.path,
         remoteTrackingBase,
         ...localWorktreeGitOptionArgs
       )
-      const refreshResult = await this.getOrStartRemoteTrackingBaseRefresh(
-        repo.path,
-        remoteTrackingBase,
-        ...localWorktreeGitOptionArgs
-      )
-      if (!refreshResult.ok && !hadLocalBaseRef) {
-        // Why: only block creation when the refresh failed AND there is no
-        // usable local base ref to fall back on. If a local remote-tracking ref
-        // already exists, `git worktree add` can create from it — a possibly
-        // stale but valid base — so a transient offline/auth failure must not
-        // make the workspace uncreatable. The compare-to-base view reflects any
-        // drift once the remote is reachable again.
-        throw new Error(
-          `Could not refresh base ref "${baseBranch}" from "${remoteTrackingBase.remote}". Check your network and try again.`
-        )
-      }
-      if (
-        !hadLocalBaseRef &&
-        !(await this.hasRemoteTrackingRef(
+      const hasLocalBaseRef =
+        hadRemoteTrackingBaseRef ||
+        (await hasLocalWorktreeBaseRef(
+          repo.path,
+          baseBranch,
+          hasLocalWorktreeGitOptions ? localWorktreeGitOptions : {}
+        ))
+      if (!hadRemoteTrackingBaseRef && hasLocalBaseRef) {
+        remoteTrackingBase = null
+      } else {
+        const refreshResult = await this.getOrStartRemoteTrackingBaseRefresh(
           repo.path,
           remoteTrackingBase,
           ...localWorktreeGitOptionArgs
-        ))
-      ) {
-        throw new Error(`Base ref "${baseBranch}" was not found after fetching.`)
+        )
+        if (!refreshResult.ok && !hadRemoteTrackingBaseRef) {
+          // Why: only block creation when the refresh failed AND there is no
+          // usable local base ref to fall back on. If a local remote-tracking ref
+          // already exists, `git worktree add` can create from it — a possibly
+          // stale but valid base — so a transient offline/auth failure must not
+          // make the workspace uncreatable. The compare-to-base view reflects any
+          // drift once the remote is reachable again.
+          throw new Error(
+            `Could not refresh base ref "${baseBranch}" from "${remoteTrackingBase.remote}". Check your network and try again.`
+          )
+        }
+        if (
+          !hadRemoteTrackingBaseRef &&
+          !(await this.hasRemoteTrackingRef(
+            repo.path,
+            remoteTrackingBase,
+            ...localWorktreeGitOptionArgs
+          ))
+        ) {
+          throw new Error(`Base ref "${baseBranch}" was not found after fetching.`)
+        }
       }
-    } else if (!(await hasLocalCommitObject(repo.path, baseBranch))) {
+    } else if (
+      !(await hasLocalWorktreeBaseRef(
+        repo.path,
+        baseBranch,
+        hasLocalWorktreeGitOptions ? localWorktreeGitOptions : {}
+      ))
+    ) {
       // Why: local bases keep legacy best-effort fetch behavior. Verified PR
       // SHA bases already have the commit object needed by `git worktree add`.
       try {
@@ -14055,7 +14205,13 @@ export class OrcaRuntimeService {
     }
 
     const promise = this.enqueueRemoteFetch(key, () =>
-      gitExecFileAsync(['fetch', remote], { cwd: repoPath, ...gitOptions })
+      gitExecFileAsync(['fetch', remote], {
+        cwd: repoPath,
+        ...gitOptions,
+        // Why: cap the create-path base-ref fetch so a stuck first-auth on
+        // Windows (GCM prompt) fails fast instead of hanging creation (STA-1292).
+        timeout: REMOTE_FETCH_TIMEOUT_MS
+      })
         .then((): RemoteFetchResult => {
           // Why (§3.3 Lifecycle): timestamp on success ONLY. Writing on rejection
           // would make the freshness cache lie about the last known remote state.
@@ -14114,7 +14270,7 @@ export class OrcaRuntimeService {
           // Why: exact remote-base refresh is the network gate for worktree
           // creation, so honor repo SSH routing and bound custom wrappers.
           useConfiguredSshCommandForNetwork: true,
-          timeout: 60_000
+          timeout: REMOTE_FETCH_TIMEOUT_MS
         }
       )
         .then((): RemoteFetchResult => {
@@ -15493,33 +15649,71 @@ export class OrcaRuntimeService {
     return { handle, tabId: leaf.tabId, title }
   }
 
+  private async resolveAgentTerminalCreateOptions(
+    workspace: TerminalWorkspaceLaunchScope,
+    opts: TerminalCreateOptions
+  ): Promise<TerminalCreateOptions> {
+    // Why: raw shell commands like `codex exec` must remain user-authored shell.
+    // Only unmanaged, repo-backed, bare agent launches get Settings defaults.
+    if (
+      !opts.command ||
+      opts.env ||
+      opts.launchConfig ||
+      opts.launchAgent ||
+      opts.startupCommandDelivery ||
+      opts.claudeAgentTeamsSourceCommand ||
+      !workspace.repo ||
+      !this.store
+    ) {
+      return opts
+    }
+
+    const settings = this.store.getSettings()
+    const platform = this.getAgentLaunchPlatformForWorkspace(workspace)
+    const isRemote = repoIsRemote(workspace.repo)
+    const agent = resolveBareAgentLaunchCommand({
+      command: opts.command,
+      settings,
+      platform,
+      isRemote
+    })
+    if (!agent) {
+      return opts
+    }
+
+    const startupPlan = buildAgentStartupPlan({
+      agent,
+      prompt: '',
+      cmdOverrides: settings.agentCmdOverrides ?? {},
+      agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
+      agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+      platform,
+      isRemote,
+      allowEmptyPromptLaunch: true
+    })
+    if (!startupPlan) {
+      return opts
+    }
+
+    if (workspace.connectionId) {
+      await this.markRemoteWorkspaceTrustedForAgent(agent, workspace.connectionId, workspace.path)
+    } else {
+      this.markLocalWorkspaceTrustedForAgent(agent, workspace.path)
+    }
+
+    return {
+      ...opts,
+      command: startupPlan.launchCommand,
+      ...(startupPlan.env ? { env: startupPlan.env } : {}),
+      launchConfig: startupPlan.launchConfig,
+      launchAgent: agent,
+      startupCommandDelivery: startupPlan.startupCommandDelivery
+    }
+  }
+
   async createTerminal(
     worktreeSelector?: string,
-    opts: {
-      command?: string
-      claudeAgentTeamsSourceCommand?: string
-      cwd?: string
-      env?: Record<string, string>
-      launchConfig?: WorktreeStartupLaunch['launchConfig']
-      launchToken?: string
-      launchAgent?: TuiAgent
-      startupCommandDelivery?: WorktreeStartupLaunch['startupCommandDelivery']
-      telemetry?: WorktreeStartupLaunch['telemetry']
-      title?: string
-      focus?: boolean
-      rendererBacked?: boolean
-      activate?: boolean
-      presentation?: RuntimeTerminalPresentation
-      tabId?: string
-      leafId?: string
-      sessionId?: string
-      persistHostSessionBinding?: boolean
-      // Why: the headless mobile-session create publishes its own authoritative
-      // snapshot (with the correct target group) right after spawn. Skip the
-      // intermediate pty-backed publish so the new tab doesn't briefly flash in
-      // the wrong (active) group before the corrected snapshot lands.
-      deferMobileSessionPublish?: boolean
-    } = {}
+    opts: TerminalCreateOptions = {}
   ): Promise<RuntimeTerminalCreate> {
     const presentation = resolveTerminalPresentation(opts)
     const requiresRendererFocus = opts.presentation === 'focused' || opts.focus === true
@@ -15542,7 +15736,9 @@ export class OrcaRuntimeService {
         throw new Error('runtime_unavailable')
       }
       const workspace = await this.resolveTerminalWorkspaceLaunchScope(worktreeSelector)
-      const cwd = this.resolveGuardedWorkspaceTerminalCwd(workspace, opts.cwd) ?? workspace.path
+      const launchOpts = await this.resolveAgentTerminalCreateOptions(workspace, opts)
+      const cwd =
+        this.resolveGuardedWorkspaceTerminalCwd(workspace, launchOpts.cwd) ?? workspace.path
       const preAllocatedHandle = this.createPreAllocatedTerminalHandle()
       // Why: mint tabId in main before spawn so paneKey is known at PTY env
       // build time. Hook-based agent status (Claude/Codex/Cursor/Gemini) keys
@@ -15550,25 +15746,27 @@ export class OrcaRuntimeService {
       // hook payload arrives with an empty paneKey and the renderer cannot
       // attribute the event. Use a stable UUID leaf because hooks reject the
       // legacy numeric pane keys after the pane-id migration.
-      const hintedTabId = opts.tabId?.trim()
+      const hintedTabId = launchOpts.tabId?.trim()
       const canAdoptPaneIdentity =
         hintedTabId !== undefined &&
         isValidHostTerminalTabId(hintedTabId) &&
-        opts.leafId !== undefined &&
-        isTerminalLeafId(opts.leafId)
+        launchOpts.leafId !== undefined &&
+        isTerminalLeafId(launchOpts.leafId)
       const tabId = canAdoptPaneIdentity ? (hintedTabId as string) : randomUUID()
-      const leafId = canAdoptPaneIdentity ? (opts.leafId as string) : randomUUID()
+      const leafId = canAdoptPaneIdentity ? (launchOpts.leafId as string) : randomUUID()
       const paneKey = makePaneKey(tabId, leafId)
-      const launchToken = opts.launchConfig ? (opts.launchToken ?? randomUUID()) : undefined
+      const launchToken = launchOpts.launchConfig
+        ? (launchOpts.launchToken ?? randomUUID())
+        : undefined
       const baseEnv = {
-        ...opts.env,
+        ...launchOpts.env,
         ...(launchToken ? { ORCA_AGENT_LAUNCH_TOKEN: launchToken } : {})
       }
       const claudeAgentTeamsSourceCommand =
-        opts.claudeAgentTeamsSourceCommand?.trim() || opts.command?.trim() || undefined
+        launchOpts.claudeAgentTeamsSourceCommand?.trim() || launchOpts.command?.trim() || undefined
       const claudeAgentTeamsMode = this.store?.getSettings?.().claudeAgentTeamsMode
       const effectiveClaudeAgentTeamsMode = inferCapturedClaudeAgentTeamsMode(
-        opts.launchConfig,
+        launchOpts.launchConfig,
         claudeAgentTeamsSourceCommand,
         claudeAgentTeamsMode
       )
@@ -15593,25 +15791,25 @@ export class OrcaRuntimeService {
       const sequencedStartupCommand =
         agentTeamsPlan &&
         claudeAgentTeamsSourceCommand &&
-        opts.command &&
-        claudeAgentTeamsSourceCommand !== opts.command
+        launchOpts.command &&
+        claudeAgentTeamsSourceCommand !== launchOpts.command
           ? agentTeamsPlan.command
           : undefined
       const effectiveLaunchConfig =
-        opts.launchConfig && agentTeamsPlan
+        launchOpts.launchConfig && agentTeamsPlan
           ? {
-              ...opts.launchConfig,
-              agentCommand: opts.launchConfig.agentCommand
+              ...launchOpts.launchConfig,
+              agentCommand: launchOpts.launchConfig.agentCommand
                 ? effectiveClaudeAgentTeamsMode === 'in-process' || process.platform === 'win32'
-                  ? addClaudeTeammateModeInProcess(opts.launchConfig.agentCommand)
-                  : addClaudeTeammateModeAuto(opts.launchConfig.agentCommand)
+                  ? addClaudeTeammateModeInProcess(launchOpts.launchConfig.agentCommand)
+                  : addClaudeTeammateModeAuto(launchOpts.launchConfig.agentCommand)
                 : agentTeamsPlan.command,
               agentEnv: {
-                ...opts.launchConfig.agentEnv,
+                ...launchOpts.launchConfig.agentEnv,
                 ...agentTeamsPlan.env
               }
             }
-          : opts.launchConfig
+          : launchOpts.launchConfig
       // Why: setup/agent sequencing wraps the PTY launch in a wait shell before
       // Claude Agent Teams runs. Preserve the direct Claude command separately
       // so the wrapper can exec the teammate-mode variant after setup completes.
@@ -15631,29 +15829,31 @@ export class OrcaRuntimeService {
         cols: 120,
         rows: 40,
         cwd,
-        command: sequencedStartupCommand ? opts.command : (agentTeamsPlan?.command ?? opts.command),
+        command: sequencedStartupCommand
+          ? launchOpts.command
+          : (agentTeamsPlan?.command ?? launchOpts.command),
         commandDelivery: 'provider',
-        startupCommandDelivery: opts.startupCommandDelivery,
+        startupCommandDelivery: launchOpts.startupCommandDelivery,
         env,
         envToDelete: agentTeamsPlan?.envToDelete,
-        telemetry: opts.telemetry,
+        telemetry: launchOpts.telemetry,
         connectionId: workspace.connectionId,
         worktreeId: workspace.id,
         preAllocatedHandle,
         tabId,
         leafId,
-        ...(opts.sessionId ? { sessionId: opts.sessionId } : {}),
-        ...(opts.persistHostSessionBinding ? { persistHostSessionBinding: true } : {})
+        ...(launchOpts.sessionId ? { sessionId: launchOpts.sessionId } : {}),
+        ...(launchOpts.persistHostSessionBinding ? { persistHostSessionBinding: true } : {})
       })
       this.registerPreAllocatedHandleForPty(result.id, preAllocatedHandle)
       this.registerPty(result.id, workspace.id, workspace.connectionId)
       const pty = this.getOrCreatePtyWorktreeRecord(result.id)
       if (pty) {
-        if (opts.title) {
+        if (launchOpts.title) {
           const observedAt = this.nextTitleObservationSequence()
-          pty.title = opts.title
+          pty.title = launchOpts.title
           pty.titleUpdatedAt = observedAt
-          this.setPtyManagementTitleFromObservedTitle(pty, opts.title, observedAt)
+          this.setPtyManagementTitleFromObservedTitle(pty, launchOpts.title, observedAt)
         } else {
           pty.title = null
           pty.titleUpdatedAt = null
@@ -15664,14 +15864,14 @@ export class OrcaRuntimeService {
           ? copySleepingAgentLaunchConfig(effectiveLaunchConfig)
           : null
         pty.launchToken = launchToken ?? null
-        pty.launchAgent = opts.launchAgent ?? null
+        pty.launchAgent = launchOpts.launchAgent ?? null
       }
       const handle = pty ? this.issuePtyHandle(pty) : preAllocatedHandle
-      if (pty && opts.deferMobileSessionPublish !== true) {
+      if (pty && launchOpts.deferMobileSessionPublish !== true) {
         this.publishPtyBackedMobileSessionTerminal(workspace.id, pty, {
           tabId,
           leafId,
-          title: opts.title ?? null,
+          title: launchOpts.title ?? null,
           activate: presentation === 'focused',
           // Why: explicit background presentation may carry legacy activate
           // metadata from an already-owned renderer pane; don't select it on mobile.
@@ -15689,11 +15889,11 @@ export class OrcaRuntimeService {
           // already baked into the PTY env — keeps paneKey hook attribution intact.
           await this.notifier.revealTerminalSession(workspace.id, {
             ptyId: result.id,
-            title: opts.title ?? null,
+            title: launchOpts.title ?? null,
             ...(cwd !== workspace.path ? { cwd } : {}),
             ...(effectiveLaunchConfig ? { launchConfig: effectiveLaunchConfig } : {}),
             ...(launchToken ? { launchToken } : {}),
-            ...(opts.launchAgent ? { launchAgent: opts.launchAgent } : {}),
+            ...(launchOpts.launchAgent ? { launchAgent: launchOpts.launchAgent } : {}),
             activate: presentation === 'focused',
             ...(presentation ? { presentation } : {}),
             tabId,
@@ -15713,7 +15913,7 @@ export class OrcaRuntimeService {
         paneKey,
         ptyId: result.id,
         worktreeId: workspace.id,
-        title: opts.title ?? null,
+        title: launchOpts.title ?? null,
         surface,
         ...(warning ? { warning } : {})
       }
@@ -15726,8 +15926,13 @@ export class OrcaRuntimeService {
     const workspace = worktreeSelector
       ? await this.resolveTerminalWorkspaceLaunchScope(worktreeSelector)
       : null
+    const launchOpts = workspace
+      ? await this.resolveAgentTerminalCreateOptions(workspace, opts)
+      : opts
     const worktreeId = workspace?.id
-    const cwd = workspace ? this.resolveGuardedWorkspaceTerminalCwd(workspace, opts.cwd) : opts.cwd
+    const cwd = workspace
+      ? this.resolveGuardedWorkspaceTerminalCwd(workspace, launchOpts.cwd)
+      : launchOpts.cwd
     const requestId = randomUUID()
 
     // Why: terminal creation is a renderer-side Zustand store operation (like
@@ -15751,21 +15956,21 @@ export class OrcaRuntimeService {
         if (r.error) {
           reject(new Error(r.error))
         } else {
-          resolve({ tabId: r.tabId!, title: r.title ?? opts.title ?? '' })
+          resolve({ tabId: r.tabId!, title: r.title ?? launchOpts.title ?? '' })
         }
       }
       ipcMain.on('terminal:tabCreateReply', handler)
       win.webContents.send('terminal:requestTabCreate', {
         requestId,
         worktreeId,
-        command: opts.command,
+        command: launchOpts.command,
         cwd,
-        ...(opts.env ? { env: opts.env } : {}),
-        ...(opts.launchConfig ? { launchConfig: opts.launchConfig } : {}),
-        ...(opts.launchToken ? { launchToken: opts.launchToken } : {}),
-        ...(opts.launchAgent ? { launchAgent: opts.launchAgent } : {}),
-        startupCommandDelivery: opts.startupCommandDelivery,
-        title: opts.title,
+        ...(launchOpts.env ? { env: launchOpts.env } : {}),
+        ...(launchOpts.launchConfig ? { launchConfig: launchOpts.launchConfig } : {}),
+        ...(launchOpts.launchToken ? { launchToken: launchOpts.launchToken } : {}),
+        ...(launchOpts.launchAgent ? { launchAgent: launchOpts.launchAgent } : {}),
+        startupCommandDelivery: launchOpts.startupCommandDelivery,
+        title: launchOpts.title,
         activate: presentation === 'focused',
         ...(presentation ? { presentation } : {})
       })
@@ -22451,6 +22656,10 @@ const PTY_CONTROLLER_LIST_TIMEOUT_MS = 3000
 // clicks and successive coordinator dispatches feel snappy, while still being
 // short enough that a genuinely-changed remote is observed on the next action.
 const FETCH_FRESHNESS_MS = 30_000
+// Why: bound create-path remote fetches so a Windows credential-manager GUI hang
+// (STA-1292) can't wedge worktree creation forever; parity with the exact-base
+// refresh sibling's timeout.
+const REMOTE_FETCH_TIMEOUT_MS = 60_000
 const REMOTE_FETCH_CACHE_MAX = 512
 const DRIFT_PROBE_SUBJECT_LIMIT = 5
 

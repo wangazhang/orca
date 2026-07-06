@@ -27,7 +27,8 @@ import {
   moveWorktree,
   parseWorktreeList,
   pruneWorktrees,
-  removeWorktree
+  removeWorktree,
+  WORKTREE_ADD_TIMEOUT_MS
 } from './worktree'
 
 describe('pruneWorktrees / getLocalBranchHead', () => {
@@ -508,7 +509,7 @@ describe('addWorktree', () => {
           '/repo-feature',
           'refs/remotes/origin/main'
         ],
-        { cwd: '/repo' }
+        { cwd: '/repo', timeout: WORKTREE_ADD_TIMEOUT_MS }
       ],
       [
         [
@@ -533,8 +534,28 @@ describe('addWorktree', () => {
     })
 
     expect(gitExecFileAsyncMock.mock.calls).toEqual([
-      [['worktree', 'add', '/repo-feature', 'feature/test'], { cwd: '/repo' }]
+      [
+        ['worktree', 'add', '/repo-feature', 'feature/test'],
+        { cwd: '/repo', timeout: WORKTREE_ADD_TIMEOUT_MS }
+      ]
     ])
+  })
+
+  it('bounds the worktree add call with a positive timeout (STA-1292 OneDrive stall guard)', async () => {
+    // Why: without a timeout, a OneDrive cloud-placeholder checkout can stall
+    // `git worktree add` for minutes. Assert the runner receives a non-zero
+    // timeout so a stuck create fails fast instead of hanging forever.
+    gitExecFileAsyncMock.mockResolvedValueOnce({ stdout: '' }) // worktree add
+
+    await addWorktree('/repo', '/repo-feature', 'feature/test', 'feature/test', false, false, {
+      checkoutExistingBranch: true
+    })
+
+    const worktreeAddCall = gitExecFileAsyncMock.mock.calls.find(
+      ([argv]) => Array.isArray(argv) && argv[0] === 'worktree' && argv[1] === 'add'
+    )
+    expect(worktreeAddCall?.[1]).toMatchObject({ timeout: WORKTREE_ADD_TIMEOUT_MS })
+    expect(WORKTREE_ADD_TIMEOUT_MS).toBeGreaterThan(0)
   })
 
   it('does not write branch base config when no base branch is provided', async () => {
@@ -546,7 +567,7 @@ describe('addWorktree', () => {
     expect(gitExecFileAsyncMock.mock.calls).toEqual([
       [
         ['worktree', 'add', '--no-track', '-b', 'feature/no-base', '/repo-feature'],
-        { cwd: '/repo' }
+        { cwd: '/repo', timeout: WORKTREE_ADD_TIMEOUT_MS }
       ],
       [['config', '--get', 'push.autoSetupRemote'], { cwd: '/repo-feature' }]
     ])
@@ -628,7 +649,7 @@ describe('addWorktree', () => {
           '/repo-feature',
           'refs/remotes/origin/main'
         ],
-        { cwd: '/repo' }
+        { cwd: '/repo', timeout: WORKTREE_ADD_TIMEOUT_MS }
       ],
       [
         [
@@ -666,7 +687,7 @@ describe('addWorktree', () => {
           '/repo-feature',
           'refs/remotes/origin/main'
         ],
-        { cwd: '/repo' }
+        { cwd: '/repo', timeout: WORKTREE_ADD_TIMEOUT_MS }
       ],
       [
         [
@@ -705,7 +726,7 @@ describe('addWorktree', () => {
           '/repo-feature',
           'refs/remotes/origin/main'
         ],
-        { cwd: '/repo' }
+        { cwd: '/repo', timeout: WORKTREE_ADD_TIMEOUT_MS }
       ],
       [
         [
@@ -745,7 +766,7 @@ describe('addWorktree', () => {
           '/repo-feature',
           'refs/remotes/origin/main'
         ],
-        { cwd: '/repo' }
+        { cwd: '/repo', timeout: WORKTREE_ADD_TIMEOUT_MS }
       ]
     ])
   })
@@ -795,7 +816,7 @@ describe('addWorktree', () => {
           '/repo-feature',
           'refs/remotes/origin/main'
         ],
-        { cwd: '/repo' }
+        { cwd: '/repo', timeout: WORKTREE_ADD_TIMEOUT_MS }
       ],
       [
         [
@@ -1309,7 +1330,7 @@ describe('addWorktree', () => {
         '/repo-feature',
         'refs/heads/main'
       ],
-      { cwd: '/repo' }
+      { cwd: '/repo', timeout: WORKTREE_ADD_TIMEOUT_MS }
     ])
   })
 
