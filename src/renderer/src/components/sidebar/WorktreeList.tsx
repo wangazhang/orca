@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   ChevronDown,
   CircleX,
+  Copy,
   Ellipsis,
   Eye,
   FolderInput,
@@ -635,6 +636,8 @@ type VirtualizedWorktreeViewportProps = {
   handleCreateFolderWorkspace: (projectGroup: ProjectGroup) => void
   handleAddStructuredWorkspace: (group: ProjectGroup) => void
   handleMountStructuredRepo: (group: ProjectGroup) => void
+  handleOpenWorkspaceSettings: (group: ProjectGroup) => void
+  handleCopyWorkspace: (group: ProjectGroup) => void
   activeModal: string
   pendingRevealWorktree: PendingSidebarWorktreeReveal | null
   pendingRevealSidebarRow: PendingSidebarRowReveal | null
@@ -1276,6 +1279,8 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
   handleCreateFolderWorkspace,
   handleAddStructuredWorkspace,
   handleMountStructuredRepo,
+  handleOpenWorkspaceSettings,
+  handleCopyWorkspace,
   activeModal,
   pendingRevealWorktree,
   pendingRevealSidebarRow,
@@ -4368,6 +4373,36 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                             onClick={stopRepoHeaderMenuEvent}
                             onKeyDown={stopRepoHeaderMenuEvent}
                           >
+                            {row.projectGroup && isStructuredWorkspaceGroup(row.projectGroup) ? (
+                              <>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    if (row.projectGroup && 'createdFrom' in row.projectGroup) {
+                                      handleOpenWorkspaceSettings(row.projectGroup)
+                                    }
+                                  }}
+                                >
+                                  <SlidersHorizontal className="size-3.5" />
+                                  {translate(
+                                    'auto.components.sidebar.WorktreeList.workspaceSettings',
+                                    'Workspace settings'
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    if (row.projectGroup && 'createdFrom' in row.projectGroup) {
+                                      handleCopyWorkspace(row.projectGroup)
+                                    }
+                                  }}
+                                >
+                                  <Copy className="size-3.5" />
+                                  {translate(
+                                    'auto.components.sidebar.WorktreeList.copyWorkspace',
+                                    'Copy workspace'
+                                  )}
+                                </DropdownMenuItem>
+                              </>
+                            ) : null}
                             <DropdownMenuItem
                               onSelect={() => {
                                 if (row.projectGroup?.id) {
@@ -6460,6 +6495,25 @@ const WorktreeList = React.memo(function WorktreeList({
     [openModal, projectGroups]
   )
 
+  // Structured workspace header menu: open the settings popup to edit this
+  // workspace's sandbox services and mounted repos. Project = parent top group.
+  const handleOpenWorkspaceSettings = useCallback(
+    (group: ProjectGroup) => {
+      const top = projectGroups.find((candidate) => candidate.id === group.parentGroupId)
+      openModal('workspace-settings', { project: (top ?? group).name, workspace: group.name })
+    },
+    [openModal, projectGroups]
+  )
+
+  // Structured workspace header menu: clone this workspace into a new iteration.
+  const handleCopyWorkspace = useCallback(
+    (group: ProjectGroup) => {
+      const top = projectGroups.find((candidate) => candidate.id === group.parentGroupId)
+      openModal('copy-workspace', { project: (top ?? group).name, workspace: group.name })
+    },
+    [openModal, projectGroups]
+  )
+
   const handleCreateFolderWorkspace = useCallback(
     (projectGroup: ProjectGroup) => {
       if (!projectGroup.parentPath) {
@@ -6942,6 +6996,8 @@ const WorktreeList = React.memo(function WorktreeList({
         handleCreateFolderWorkspace={handleCreateFolderWorkspace}
         handleAddStructuredWorkspace={handleAddStructuredWorkspace}
         handleMountStructuredRepo={handleMountStructuredRepo}
+        handleOpenWorkspaceSettings={handleOpenWorkspaceSettings}
+        handleCopyWorkspace={handleCopyWorkspace}
         activeModal={activeModal}
         pendingRevealWorktree={pendingRevealWorktree}
         pendingRevealSidebarRow={pendingRevealSidebarRow}

@@ -80,6 +80,9 @@ import NewStructuredIterationDialog from './NewStructuredIterationDialog'
 
 let container: HTMLDivElement
 let root: Root
+// Captures the wizard's native-file-drop subscription so tests can simulate a
+// preload-relayed folder drop on the repos step.
+let lastFileDropCallback: ((data: unknown) => void) | null = null
 
 beforeEach(() => {
   callRuntimeRpcMock.mockReset()
@@ -90,19 +93,34 @@ beforeEach(() => {
   fetchGroupsMock.mockReset().mockResolvedValue(undefined)
   fetchFolderWorkspacesMock.mockReset().mockResolvedValue(undefined)
   fetchWorktreesMock.mockReset().mockResolvedValue(undefined)
-  callRuntimeRpcMock.mockImplementation((_target: unknown, method: string) => {
+  callRuntimeRpcMock.mockImplementation((_target: unknown, method: string, params: unknown) => {
     if (method === 'iteration.create') {
       return Promise.resolve({ project: { name: 'Demo' } })
     }
     if (method === 'iteration.workspaceCreate') {
       return Promise.resolve({ workspace: {} })
     }
+    if (method === 'iteration.checkGitRepo') {
+      const path = (params as { path?: string })?.path ?? ''
+      return Promise.resolve({ isGitRepo: true, repoName: path.split('/').pop() || 'repo' })
+    }
     if (method === 'iteration.workspaceAddRepo') {
       return Promise.resolve({ worktree: { repoId: 'repo' } })
     }
     return Promise.resolve({})
   })
-  ;(window as unknown as { api: unknown }).api = { repos: { pickDirectory: pickDirectoryMock } }
+  lastFileDropCallback = null
+  ;(window as unknown as { api: unknown }).api = {
+    repos: { pickDirectory: pickDirectoryMock },
+    ui: {
+      onFileDrop: (cb: (data: unknown) => void) => {
+        lastFileDropCallback = cb
+        return () => {
+          lastFileDropCallback = null
+        }
+      }
+    }
+  }
   storeState.activeModal = 'structured-iteration'
   storeState.modalData = {}
   container = document.createElement('div')
@@ -158,6 +176,13 @@ function methodCalls(method: string): unknown[][] {
   return callRuntimeRpcMock.mock.calls.filter((c) => c[1] === method)
 }
 
+// Simulate a preload-relayed native folder drop on the repos step's drop target.
+async function dropFolder(path: string): Promise<void> {
+  await act(async () => {
+    lastFileDropCallback?.({ target: 'iteration-repos', paths: [path] })
+  })
+}
+
 describe('NewStructuredIterationDialog', () => {
   it('drives create → workspaceCreate → workspaceAddRepo → materialize across the three steps', async () => {
     await render()
@@ -192,17 +217,23 @@ describe('NewStructuredIterationDialog', () => {
       }
     )
 
-    // Step 3 — pick a local folder → iteration.workspaceAddRepo
+    // Step 3 — pick a local folder → git-detect + queue as pending, NOT mounted yet
     pickDirectoryMock.mockResolvedValue('/src/qa-pk')
     await click(button('Choose a local Git folder'))
+    expect(callRuntimeRpcMock).toHaveBeenCalledWith({ kind: 'local' }, 'iteration.checkGitRepo', {
+      path: '/src/qa-pk'
+    })
+    // Deferred: the mount does not happen on pick.
+    expect(methodCalls('iteration.workspaceAddRepo').length).toBe(0)
+    expect(container.textContent).toContain('qa-pk')
+
+    // Finish — the queued repo mounts on Done, then materialize + refresh + close
+    await click(button('Done'))
     expect(callRuntimeRpcMock).toHaveBeenCalledWith(
       { kind: 'local' },
       'iteration.workspaceAddRepo',
       { project: 'Demo', workspace: 'it1', source: '/src/qa-pk' }
     )
-
-    // Finish — materialize + refresh + toast + close
-    await click(button('Done'))
     expect(callRuntimeRpcMock).toHaveBeenCalledWith({ kind: 'local' }, 'iteration.materialize', {
       project: 'Demo'
     })
@@ -254,12 +285,19 @@ describe('NewStructuredIterationDialog', () => {
     expect(closeModalMock).toHaveBeenCalled()
   })
 
-  it('re-enters at the repos step and mounts into the seeded project + workspace', async () => {
+  it('re-enters at the repos step and defers the mount into the seeded project + workspace until Done', async () => {
     await openWith({ project: 'penguin-x', workspace: 'it2', startAt: 'repos' })
 
     expect(container.querySelector('#structured-iteration-name')).toBeNull()
     pickDirectoryMock.mockResolvedValue('/src/mrs')
     await click(button('Choose a local Git folder'))
+    // Picking git-detects and queues; no mount yet.
+    expect(callRuntimeRpcMock).toHaveBeenCalledWith({ kind: 'local' }, 'iteration.checkGitRepo', {
+      path: '/src/mrs'
+    })
+    expect(methodCalls('iteration.workspaceAddRepo').length).toBe(0)
+
+    await click(button('Done'))
     expect(callRuntimeRpcMock).toHaveBeenCalledWith(
       { kind: 'local' },
       'iteration.workspaceAddRepo',
@@ -267,10 +305,61 @@ describe('NewStructuredIterationDialog', () => {
     )
   })
 
+  it('git-detects a rejected folder inline and does not queue it', async () => {
+    callRuntimeRpcMock.mockImplementation((_target: unknown, method: string) => {
+      if (method === 'iteration.checkGitRepo') {
+        return Promise.resolve({ isGitRepo: false, repoName: '' })
+      }
+      return Promise.resolve({})
+    })
+    await openWith({ project: 'penguin-x', workspace: 'it2', startAt: 'repos' })
+
+    pickDirectoryMock.mockResolvedValue('/src/not-git')
+    await click(button('Choose a local Git folder'))
+    expect(container.textContent).toContain('Not a Git repository')
+    // Rejected → nothing queued, so Done mounts nothing.
+    await click(button('Done'))
+    expect(methodCalls('iteration.workspaceAddRepo').length).toBe(0)
+  })
+
+  it('queues a dropped folder on the repos step and mounts it on Done', async () => {
+    await openWith({ project: 'penguin-x', workspace: 'it2', startAt: 'repos' })
+
+    await dropFolder('/src/dropped-repo')
+    expect(callRuntimeRpcMock).toHaveBeenCalledWith({ kind: 'local' }, 'iteration.checkGitRepo', {
+      path: '/src/dropped-repo'
+    })
+    expect(container.textContent).toContain('dropped-repo')
+    expect(methodCalls('iteration.workspaceAddRepo').length).toBe(0)
+
+    await click(button('Done'))
+    expect(callRuntimeRpcMock).toHaveBeenCalledWith(
+      { kind: 'local' },
+      'iteration.workspaceAddRepo',
+      { project: 'penguin-x', workspace: 'it2', source: '/src/dropped-repo' }
+    )
+  })
+
+  it('removes a still-pending repo before Done so it never mounts', async () => {
+    await openWith({ project: 'penguin-x', workspace: 'it2', startAt: 'repos' })
+
+    pickDirectoryMock.mockResolvedValue('/src/oops')
+    await click(button('Choose a local Git folder'))
+    expect(container.textContent).toContain('oops')
+
+    const removeButton = container.querySelector<HTMLButtonElement>('button[aria-label="Remove"]')
+    expect(removeButton).not.toBeNull()
+    await click(removeButton as HTMLElement)
+    expect(container.textContent).not.toContain('oops')
+
+    await click(button('Done'))
+    expect(methodCalls('iteration.workspaceAddRepo').length).toBe(0)
+  })
+
   it('shows the workspace’s already-mounted repos when re-entering the repos step', async () => {
     // iteration.get is the disk source of truth for what is already mounted; the
     // repos step pulls it on entry so existing worktrees render before any add.
-    callRuntimeRpcMock.mockImplementation((_target: unknown, method: string) => {
+    callRuntimeRpcMock.mockImplementation((_target: unknown, method: string, params: unknown) => {
       if (method === 'iteration.get') {
         return Promise.resolve({
           project: {
@@ -280,8 +369,9 @@ describe('NewStructuredIterationDialog', () => {
           }
         })
       }
-      if (method === 'iteration.workspaceAddRepo') {
-        return Promise.resolve({ worktree: { repoId: 'fresh-one', path: '/q', branch: 'it2' } })
+      if (method === 'iteration.checkGitRepo') {
+        const path = (params as { path?: string })?.path ?? ''
+        return Promise.resolve({ isGitRepo: true, repoName: path.split('/').pop() || 'repo' })
       }
       return Promise.resolve({})
     })
@@ -293,10 +383,27 @@ describe('NewStructuredIterationDialog', () => {
     ])
     expect(container.textContent).toContain('already-here')
 
-    // Adding another mounts it and re-pulls; both existing and fresh show.
-    pickDirectoryMock.mockResolvedValue('/src/fresh')
+    // Queuing another shows it as pending alongside the existing mount.
+    pickDirectoryMock.mockResolvedValue('/src/fresh-one')
     await click(button('Choose a local Git folder'))
     expect(container.textContent).toContain('already-here')
     expect(container.textContent).toContain('fresh-one')
+  })
+
+  it('re-enters the workspace step on an existing project with workspaces and drops the “first” title', async () => {
+    callRuntimeRpcMock.mockImplementation((_target: unknown, method: string) => {
+      if (method === 'iteration.get') {
+        return Promise.resolve({
+          project: { workspaces: [{ name: 'it1', worktrees: [] }] }
+        })
+      }
+      return Promise.resolve({})
+    })
+
+    await openWith({ project: 'penguin-x', startAt: 'workspace' })
+
+    expect(methodCalls('iteration.get').length).toBeGreaterThan(0)
+    expect(container.textContent).toContain('Create a workspace')
+    expect(container.textContent).not.toContain('Create the first workspace')
   })
 })

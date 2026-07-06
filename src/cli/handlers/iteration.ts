@@ -111,6 +111,14 @@ export const ITERATION_HANDLERS: Record<string, CommandHandler> = {
     })
     printResult(result, json, (r) => formatWorkspace(r.workspace))
   },
+  'iteration workspace copy': async ({ flags, client, json }) => {
+    const result = await client.call<{ workspace: WorkspaceResult }>('iteration.workspaceCopy', {
+      project: getRequiredStringFlag(flags, 'project'),
+      source: getRequiredStringFlag(flags, 'source'),
+      name: getRequiredStringFlag(flags, 'name')
+    })
+    printResult(result, json, (r) => formatWorkspace(r.workspace))
+  },
   'iteration workspace add-repo': async ({ flags, client, cwd, json }) => {
     const rawSource = getRequiredStringFlag(flags, 'source')
     const result = await client.call<{ worktree: WorktreeResult }>('iteration.workspaceAddRepo', {

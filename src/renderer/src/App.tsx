@@ -306,6 +306,8 @@ const ProjectAddedDialog = lazy(() => import('./components/sidebar/ProjectAddedD
 const NewStructuredIterationDialog = lazy(
   () => import('./components/sidebar/NewStructuredIterationDialog')
 )
+const CopyWorkspaceDialog = lazy(() => import('./components/sidebar/CopyWorkspaceDialog'))
+const WorkspaceSettingsDialog = lazy(() => import('./components/sidebar/WorkspaceSettingsDialog'))
 const DeleteWorktreeDialog = lazy(() => import('./components/sidebar/DeleteWorktreeDialog'))
 const DictationController = lazy(() =>
   import('./components/dictation/DictationController').then((module) => ({
@@ -2505,6 +2507,26 @@ function App(): React.JSX.Element {
                   compact
                 >
                   <NewStructuredIterationDialog />
+                </RecoverableRenderErrorBoundary>
+              ) : null}
+              {activeModal === 'copy-workspace' ? (
+                <RecoverableRenderErrorBoundary
+                  boundaryId="modal.copy-workspace"
+                  surface="modal"
+                  resetKey
+                  compact
+                >
+                  <CopyWorkspaceDialog />
+                </RecoverableRenderErrorBoundary>
+              ) : null}
+              {activeModal === 'workspace-settings' ? (
+                <RecoverableRenderErrorBoundary
+                  boundaryId="modal.workspace-settings"
+                  surface="modal"
+                  resetKey
+                  compact
+                >
+                  <WorkspaceSettingsDialog />
                 </RecoverableRenderErrorBoundary>
               ) : null}
               {activeModal === 'project-added' ? (

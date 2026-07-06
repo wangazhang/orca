@@ -721,6 +721,8 @@ export type UISlice = {
     | 'new-workspace-composer'
     | 'confirm-orca-yaml-hooks'
     | 'structured-iteration'
+    | 'copy-workspace'
+    | 'workspace-settings'
   modalData: Record<string, unknown>
   openModal: (modal: UISlice['activeModal'], data?: Record<string, unknown>) => void
   closeModal: () => void

@@ -44,6 +44,7 @@ Projects:
 Iterations:
   iteration create          Create a structured project (physical root + project.json)
   iteration workspace create  Create an isolated workspace (iteration) under a project
+  iteration workspace copy  Copy a workspace into a new one (fresh ports + remounted repos)
   iteration workspace add-repo Mount a source repo into a workspace as a git worktree
   iteration list            List structured projects under ~/orca/projects
   iteration delete          Delete a structured project (root, records, optional branches)

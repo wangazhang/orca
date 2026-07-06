@@ -1,8 +1,20 @@
+import { basename } from 'node:path'
 import { z } from 'zod'
 import { normalizeExecutionHostId } from '../../../../shared/execution-host'
 import { defineMethod, type RpcMethod } from '../core'
 import { OptionalString, requiredString } from '../schemas'
-import { structuredServiceKindSchema } from '../../../../shared/structured-project-schema'
+import { isGitRepo } from '../../../git/repo'
+import {
+  IterationCheckGitRepo,
+  IterationCreate,
+  IterationDelete,
+  IterationGet,
+  IterationWorkspaceAddRepo,
+  IterationWorkspaceCopy,
+  IterationWorkspaceCreate,
+  IterationWorkspaceRemoveRepo,
+  IterationWorkspaceUpdate
+} from './iteration-rpc-schemas'
 import {
   addWorkspaceRepoService,
   createStructuredProjectService,
@@ -11,6 +23,9 @@ import {
   getStructuredProjectService,
   listStructuredProjectsService
 } from '../../../structured-projects/structured-project-service'
+import { copyStructuredWorkspaceService } from '../../../structured-projects/structured-workspace-copy'
+import { updateStructuredWorkspaceServicesService } from '../../../structured-projects/structured-workspace-update'
+import { removeStructuredWorkspaceRepoService } from '../../../structured-projects/structured-workspace-remove-repo'
 import {
   materializeAllStructuredProjects,
   materializeStructuredProject
@@ -98,37 +113,6 @@ const ProjectHostSetupUpdate = z.object({
 
 const ProjectHostSetupDelete = z.object({
   setupId: requiredString('Missing setup ID')
-})
-
-// ─── Structured projects (iteration.*) ──────────────────────────────
-const IterationCreate = z.object({
-  name: requiredString('Missing project name'),
-  services: z.array(structuredServiceKindSchema).default([]),
-  rootPath: OptionalString
-})
-
-const IterationWorkspaceCreate = z.object({
-  project: requiredString('Missing project name or id'),
-  name: requiredString('Missing workspace name')
-})
-
-const IterationWorkspaceAddRepo = z.object({
-  project: requiredString('Missing project name or id'),
-  workspace: requiredString('Missing workspace name'),
-  source: requiredString('Missing repo source path'),
-  repoId: OptionalString,
-  defaultBranch: OptionalString
-})
-
-const IterationGet = z.object({
-  project: requiredString('Missing project name or id')
-})
-
-const IterationDelete = z.object({
-  project: requiredString('Missing project name or id'),
-  // Off by default: deleting leftover `<workspace>` branches touches the user's
-  // source repos and may discard unmerged work, so it is an explicit opt-in.
-  deleteBranches: z.boolean().optional()
 })
 
 export const PROJECT_RUNTIME_METHODS: RpcMethod[] = [
@@ -232,6 +216,55 @@ export const PROJECT_RUNTIME_METHODS: RpcMethod[] = [
       })
       return { worktree }
     }
+  }),
+  defineMethod({
+    name: 'iteration.checkGitRepo',
+    params: IterationCheckGitRepo,
+    handler: (params) => ({
+      isGitRepo: isGitRepo(params.path),
+      repoName: basename(params.path)
+    })
+  }),
+  defineMethod({
+    name: 'iteration.workspaceCopy',
+    params: IterationWorkspaceCopy,
+    handler: async (params, { runtime }) => {
+      // Register each remounted source repo with orca so the copied worktrees
+      // become orca-managed (mirrors workspaceAddRepo); the copy service pre-awaits
+      // registerManagedRepo per source and hands the mount the sync meta hook.
+      const workspace = await copyStructuredWorkspaceService({
+        project: params.project,
+        sourceWorkspace: params.source,
+        name: params.name,
+        registration: {
+          registerManagedRepo: (source) => runtime.registerManagedRepo(source),
+          setWorktreeMeta: (id, meta) => runtime.setStructuredWorktreeMeta(id, meta)
+        }
+      })
+      return { workspace }
+    }
+  }),
+  defineMethod({
+    name: 'iteration.workspaceUpdate',
+    params: IterationWorkspaceUpdate,
+    handler: async (params) => ({
+      workspace: await updateStructuredWorkspaceServicesService({
+        project: params.project,
+        workspace: params.workspace,
+        services: params.services
+      })
+    })
+  }),
+  defineMethod({
+    name: 'iteration.workspaceRemoveRepo',
+    params: IterationWorkspaceRemoveRepo,
+    // Returns { removed: boolean } directly — the frozen contract shape.
+    handler: async (params) =>
+      removeStructuredWorkspaceRepoService({
+        project: params.project,
+        workspace: params.workspace,
+        repoId: params.repoId
+      })
   }),
   defineMethod({
     name: 'iteration.list',

@@ -26,6 +26,18 @@ export const ITERATION_COMMAND_SPECS: CommandSpec[] = [
     examples: ['orca iteration workspace create --project Penguin-go --name youho']
   },
   {
+    path: ['iteration', 'workspace', 'copy'],
+    summary: 'Copy a workspace into a new one (fresh sandbox ports + remounted repos)',
+    usage:
+      'orca iteration workspace copy --project <name> --source <workspace> --name <new-workspace> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'project', 'source', 'name'],
+    notes: [
+      'Scaffolds a new workspace reusing the source workspace services, with its own host ports.',
+      'Each repo mounted in --source is remounted into the new workspace on its branch.'
+    ],
+    examples: ['orca iteration workspace copy --project Penguin-go --source youho --name youho2']
+  },
+  {
     path: ['iteration', 'workspace', 'add-repo'],
     summary: 'Mount a source repo into a workspace as a git worktree under src/',
     usage:

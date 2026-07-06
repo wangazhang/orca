@@ -4082,7 +4082,9 @@
           "sidebarRowMissing": "対象はもう存在しません",
           "failedUnnestWorkspace": "Failed to unnest workspace",
           "structuredAddWorkspace": "New workspace in {{value0}}",
-          "structuredMountRepo": "Mount repository into {{value0}}"
+          "structuredMountRepo": "Mount repository into {{value0}}",
+          "workspaceSettings": "Workspace settings",
+          "copyWorkspace": "Copy workspace"
         },
         "WorktreeMetaDialog": {
           "3db0a2a593": "キャンセル",
@@ -4530,7 +4532,35 @@
           "finish": "Done",
           "createProjectOnly": "Create project only",
           "createAndAddWorkspace": "Create & add workspace",
-          "skipWorkspace": "Skip"
+          "skipWorkspace": "Skip",
+          "workspaceTitleMore": "Create a workspace",
+          "workspaceDescriptionMore": "Add another iteration: its own sandbox ports and repo worktrees.",
+          "repoNewBadge": "new",
+          "repoPendingBadge": "pending",
+          "removePendingRepo": "Remove",
+          "dropRepoHint": "…or drop a local Git folder here",
+          "notGitRepo": "Not a Git repository"
+        },
+        "CopyWorkspaceDialog": {
+          "title": "Copy workspace",
+          "description": "Clone this workspace’s sandbox services and mounted repos into a new iteration.",
+          "sourceLabel": "Source",
+          "nameLabel": "New workspace name",
+          "copy": "Copy",
+          "copiedTitle": "Workspace copied"
+        },
+        "WorkspaceSettingsDialog": {
+          "title": "Workspace settings",
+          "description": "Adjust the sandbox services and mounted repos for {{value0}}.",
+          "servicesLabel": "Sandbox services",
+          "reposLabel": "Mounted repositories",
+          "repoNewBadge": "new",
+          "removeRepo": "Remove {{value0}}",
+          "reposEmpty": "No repositories mounted yet.",
+          "addRepo": "Add a local Git folder…",
+          "save": "Save",
+          "notGitFolder": "That folder is not a Git repository.",
+          "savedTitle": "Workspace updated"
         }
       },
       "shared": {

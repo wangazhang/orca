@@ -46,7 +46,13 @@ export function getProjectsDir(): string {
   return join(homedir(), 'orca', 'projects')
 }
 
-function resolveProject(idOrName: string): { rootPath: string; project: StructuredProjectFile } {
+// Exported so the workspace-copy / -update / -remove-repo modules resolve a
+// project by name-or-folder the same way (and throw the same `not found`) rather
+// than each re-implementing the scan-and-match.
+export function resolveProject(idOrName: string): {
+  rootPath: string
+  project: StructuredProjectFile
+} {
   const found = scanStructuredProjects(getProjectsDir()).find(
     (p) => p.project.name === idOrName || basename(p.rootPath) === idOrName
   )

@@ -10,7 +10,8 @@ export const NATIVE_FILE_DROP_TARGET = {
   terminal: 'terminal',
   composer: 'composer',
   fileExplorer: 'file-explorer',
-  projectSidebar: 'project-sidebar'
+  projectSidebar: 'project-sidebar',
+  iterationRepos: 'iteration-repos'
 } as const
 
 export type NativeDropResolution =
@@ -19,6 +20,7 @@ export type NativeDropResolution =
   | { target: typeof NATIVE_FILE_DROP_TARGET.composer }
   | { target: typeof NATIVE_FILE_DROP_TARGET.fileExplorer; destinationDir: string }
   | { target: typeof NATIVE_FILE_DROP_TARGET.projectSidebar }
+  | { target: typeof NATIVE_FILE_DROP_TARGET.iterationRepos }
   | { target: 'rejected' }
 
 export type NativeFileDropPayload =
@@ -36,6 +38,7 @@ export type NativeFileDropPayload =
       destinationDir: string
     }
   | { paths: string[]; target: typeof NATIVE_FILE_DROP_TARGET.projectSidebar }
+  | { paths: string[]; target: typeof NATIVE_FILE_DROP_TARGET.iterationRepos }
   | NativeFileDropRejectedPayload
 
 export type NativeFileDropRejectedPayload = {
@@ -113,6 +116,9 @@ export function resolveNativeFileDropPath(
       return { target }
     }
     if (target === NATIVE_FILE_DROP_TARGET.projectSidebar) {
+      return { target }
+    }
+    if (target === NATIVE_FILE_DROP_TARGET.iterationRepos) {
       return { target }
     }
     if (target === NATIVE_FILE_DROP_TARGET.fileExplorer) {
@@ -264,6 +270,7 @@ export function isNativeFileDropPayload(value: unknown): value is NativeFileDrop
   return (
     target === NATIVE_FILE_DROP_TARGET.editor ||
     target === NATIVE_FILE_DROP_TARGET.composer ||
-    target === NATIVE_FILE_DROP_TARGET.projectSidebar
+    target === NATIVE_FILE_DROP_TARGET.projectSidebar ||
+    target === NATIVE_FILE_DROP_TARGET.iterationRepos
   )
 }

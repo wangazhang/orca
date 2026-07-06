@@ -1,5 +1,5 @@
 import React from 'react'
-import { Boxes, Check, FolderPlus, Loader2 } from 'lucide-react'
+import { Boxes, Check, FolderPlus, Loader2, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -26,6 +26,7 @@ const NewStructuredIterationDialog = React.memo(function NewStructuredIterationD
     toggleService,
     workspaceName,
     setWorkspaceName,
+    workspaceIsFirst,
     mountedRepos,
     busy,
     error,
@@ -35,6 +36,10 @@ const NewStructuredIterationDialog = React.memo(function NewStructuredIterationD
     handleCreateWorkspace,
     handleSkipWorkspace,
     handleAddRepo,
+    handleRemovePendingRepo,
+    reposDropTarget,
+    reposDropHandlers,
+    isReposDragOver,
     runMaterializeAndClose,
     handleOpenChange
   } = useStructuredIterationWizard()
@@ -46,10 +51,15 @@ const NewStructuredIterationDialog = React.memo(function NewStructuredIterationD
           'New structured iteration'
         )
       : step === 'workspace'
-        ? translate(
-            'auto.components.sidebar.NewStructuredIterationDialog.workspaceTitle',
-            'Create the first workspace'
-          )
+        ? workspaceIsFirst
+          ? translate(
+              'auto.components.sidebar.NewStructuredIterationDialog.workspaceTitle',
+              'Create the first workspace'
+            )
+          : translate(
+              'auto.components.sidebar.NewStructuredIterationDialog.workspaceTitleMore',
+              'Create a workspace'
+            )
         : translate(
             'auto.components.sidebar.NewStructuredIterationDialog.reposTitle',
             'Add repositories'
@@ -62,10 +72,15 @@ const NewStructuredIterationDialog = React.memo(function NewStructuredIterationD
           'An on-disk project root with docs, an isolated sandbox, and multiple repos.'
         )
       : step === 'workspace'
-        ? translate(
-            'auto.components.sidebar.NewStructuredIterationDialog.workspaceDescription',
-            'A workspace is one iteration: its own sandbox ports and repo worktrees.'
-          )
+        ? workspaceIsFirst
+          ? translate(
+              'auto.components.sidebar.NewStructuredIterationDialog.workspaceDescription',
+              'A workspace is one iteration: its own sandbox ports and repo worktrees.'
+            )
+          : translate(
+              'auto.components.sidebar.NewStructuredIterationDialog.workspaceDescriptionMore',
+              'Add another iteration: its own sandbox ports and repo worktrees.'
+            )
         : translate(
             'auto.components.sidebar.NewStructuredIterationDialog.reposDescription',
             'Mount local Git repositories as worktrees on the workspace branch.'
@@ -152,15 +167,25 @@ const NewStructuredIterationDialog = React.memo(function NewStructuredIterationD
         )}
 
         {step === 'repos' && (
-          <div className="space-y-3 pt-1">
+          <div
+            data-native-file-drop-target={reposDropTarget}
+            className={`space-y-3 rounded-md pt-1 transition-colors ${
+              isReposDragOver ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
+            }`}
+            {...reposDropHandlers}
+          >
             {mountedRepos.length > 0 ? (
               <ul className="space-y-1">
                 {mountedRepos.map((repo) => (
                   <li
-                    key={repo.repoId}
+                    key={repo.key}
                     className="flex items-center gap-2 rounded-md border border-border/70 bg-muted/35 px-3 py-2 text-xs"
                   >
-                    <Check className="size-3.5 text-primary" />
+                    {repo.isPending ? (
+                      <FolderPlus className="size-3.5 text-muted-foreground" />
+                    ) : (
+                      <Check className="size-3.5 text-primary" />
+                    )}
                     <span className="break-all font-mono">{repo.repoId}</span>
                     {repo.branch && (
                       <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground">
@@ -174,6 +199,32 @@ const NewStructuredIterationDialog = React.memo(function NewStructuredIterationD
                           'new'
                         )}
                       </span>
+                    )}
+                    {repo.isPending && repo.source && (
+                      <>
+                        <span
+                          className={`shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400 ${
+                            repo.branch ? '' : 'ml-auto'
+                          }`}
+                        >
+                          {translate(
+                            'auto.components.sidebar.NewStructuredIterationDialog.repoPendingBadge',
+                            'pending'
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePendingRepo(repo.source as string)}
+                          disabled={busy}
+                          aria-label={translate(
+                            'auto.components.sidebar.NewStructuredIterationDialog.removePendingRepo',
+                            'Remove'
+                          )}
+                          className="shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-50"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </>
                     )}
                   </li>
                 ))}
@@ -197,6 +248,12 @@ const NewStructuredIterationDialog = React.memo(function NewStructuredIterationD
                 'Choose a local Git folder…'
               )}
             </Button>
+            <p className="text-center text-[11px] text-muted-foreground">
+              {translate(
+                'auto.components.sidebar.NewStructuredIterationDialog.dropRepoHint',
+                '…or drop a local Git folder here'
+              )}
+            </p>
           </div>
         )}
 

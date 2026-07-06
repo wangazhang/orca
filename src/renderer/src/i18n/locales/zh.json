@@ -4082,7 +4082,9 @@
           "sidebarRowMissing": "目标不再存在",
           "failedUnnestWorkspace": "Failed to unnest workspace",
           "structuredAddWorkspace": "在 {{value0}} 中新建工作区",
-          "structuredMountRepo": "将仓库挂载到 {{value0}}"
+          "structuredMountRepo": "将仓库挂载到 {{value0}}",
+          "workspaceSettings": "Workspace settings",
+          "copyWorkspace": "Copy workspace"
         },
         "WorktreeMetaDialog": {
           "3db0a2a593": "取消",
@@ -4530,7 +4532,35 @@
           "finish": "完成",
           "createProjectOnly": "仅创建项目",
           "createAndAddWorkspace": "创建并添加工作空间",
-          "skipWorkspace": "跳过"
+          "skipWorkspace": "跳过",
+          "workspaceTitleMore": "Create a workspace",
+          "workspaceDescriptionMore": "Add another iteration: its own sandbox ports and repo worktrees.",
+          "repoNewBadge": "new",
+          "repoPendingBadge": "pending",
+          "removePendingRepo": "Remove",
+          "dropRepoHint": "…or drop a local Git folder here",
+          "notGitRepo": "Not a Git repository"
+        },
+        "CopyWorkspaceDialog": {
+          "title": "Copy workspace",
+          "description": "Clone this workspace’s sandbox services and mounted repos into a new iteration.",
+          "sourceLabel": "Source",
+          "nameLabel": "New workspace name",
+          "copy": "Copy",
+          "copiedTitle": "Workspace copied"
+        },
+        "WorkspaceSettingsDialog": {
+          "title": "Workspace settings",
+          "description": "Adjust the sandbox services and mounted repos for {{value0}}.",
+          "servicesLabel": "Sandbox services",
+          "reposLabel": "Mounted repositories",
+          "repoNewBadge": "new",
+          "removeRepo": "Remove {{value0}}",
+          "reposEmpty": "No repositories mounted yet.",
+          "addRepo": "Add a local Git folder…",
+          "save": "Save",
+          "notGitFolder": "That folder is not a Git repository.",
+          "savedTitle": "Workspace updated"
         }
       },
       "shared": {
