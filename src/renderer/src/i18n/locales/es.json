@@ -4102,7 +4102,11 @@
           "hostDisconnected": "Desconectado",
           "failedNestWorkspace": "No se pudo anidar el espacio de trabajo",
           "sidebarRowMissing": "El destino ya no existe",
-          "failedUnnestWorkspace": "No se pudo quitar la anidación del espacio de trabajo"
+          "failedUnnestWorkspace": "No se pudo quitar la anidación del espacio de trabajo",
+          "structuredAddWorkspace": "New workspace in {{value0}}",
+          "structuredMountRepo": "Mount repository into {{value0}}",
+          "workspaceSettings": "Workspace settings",
+          "copyWorkspace": "Copy workspace"
         },
         "WorktreeMetaDialog": {
           "3db0a2a593": "Cancelar",
@@ -4165,7 +4169,9 @@
                   "sshCreateUnavailable": "Aún no disponible para hosts SSH",
                   "sshBrowseTitle": "Abrir proyecto en host SSH",
                   "sshBrowseDescription": "Repositorio Git o carpeta existente en este host SSH",
-                  "runtimeBrowseDescription": "Repositorio Git o carpeta existente en este host"
+                  "runtimeBrowseDescription": "Repositorio Git o carpeta existente en este host",
+                  "structuredIterationTitle": "Structured iteration",
+                  "structuredIterationDescription": "Iteration root with docs, an isolated sandbox, and multiple repos"
                 }
               }
             }
@@ -4510,6 +4516,54 @@
           "importing": "Importando...",
           "importSshConfig": "Importar ~/.ssh/config",
           "sshPersistenceDefault": "Los terminales remotos en este host seguirán activos hasta que los cierres o restablezcas el relay."
+        },
+        "NewStructuredIterationDialog": {
+          "finishTitle": "Structured iteration ready",
+          "projectTitle": "New structured iteration",
+          "workspaceTitle": "Create the first workspace",
+          "reposTitle": "Add repositories",
+          "projectDescription": "An on-disk project root with docs, an isolated sandbox, and multiple repos.",
+          "workspaceDescription": "A workspace is one iteration: its own sandbox ports and repo worktrees.",
+          "reposDescription": "Mount local Git repositories as worktrees on the workspace branch.",
+          "nameLabel": "Project name",
+          "servicesLabel": "Sandbox services",
+          "workspaceNameLabel": "Workspace name",
+          "reposEmpty": "No repositories added yet.",
+          "pickRepo": "Choose a local Git folder…",
+          "createProject": "Create project",
+          "createWorkspace": "Create workspace",
+          "finish": "Done",
+          "createProjectOnly": "Create project only",
+          "createAndAddWorkspace": "Create & add workspace",
+          "skipWorkspace": "Skip",
+          "workspaceTitleMore": "Create a workspace",
+          "workspaceDescriptionMore": "Add another iteration: its own sandbox ports and repo worktrees.",
+          "repoNewBadge": "new",
+          "repoPendingBadge": "pending",
+          "removePendingRepo": "Remove",
+          "dropRepoHint": "…or drop a local Git folder here",
+          "notGitRepo": "Not a Git repository"
+        },
+        "CopyWorkspaceDialog": {
+          "title": "Copy workspace",
+          "description": "Clone this workspace’s sandbox services and mounted repos into a new iteration.",
+          "sourceLabel": "Source",
+          "nameLabel": "New workspace name",
+          "copy": "Copy",
+          "copiedTitle": "Workspace copied"
+        },
+        "WorkspaceSettingsDialog": {
+          "title": "Workspace settings",
+          "description": "Adjust the sandbox services and mounted repos for {{value0}}.",
+          "servicesLabel": "Sandbox services",
+          "reposLabel": "Mounted repositories",
+          "repoNewBadge": "new",
+          "removeRepo": "Remove {{value0}}",
+          "reposEmpty": "No repositories mounted yet.",
+          "addRepo": "Add a local Git folder…",
+          "save": "Save",
+          "notGitFolder": "That folder is not a Git repository.",
+          "savedTitle": "Workspace updated"
         }
       },
       "shared": {
