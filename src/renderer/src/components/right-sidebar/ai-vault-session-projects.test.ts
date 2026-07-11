@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { ProjectHostSetupProjection } from '../../../../shared/project-host-setup-projection'
 import type { AiVaultSession } from '../../../../shared/ai-vault-types'
-import type { Project, ProjectHostSetup, Repo, Worktree } from '../../../../shared/types'
+import type {
+  FolderWorkspace,
+  Project,
+  ProjectGroup,
+  ProjectHostSetup,
+  Repo,
+  Worktree
+} from '../../../../shared/types'
 import { buildAiVaultProjectContext, toAiVaultProjectKey } from './ai-vault-session-projects'
 
 const baseSession: AiVaultSession = {
@@ -174,6 +181,69 @@ describe('buildAiVaultProjectContext', () => {
 
     expect(context.activeProjectKey).toBe('project:github:stablyai/orca')
     expect(context.sessionProjectById.get(session.id)?.key).toBe('project:github:stablyai/orca')
+  })
+
+  it('resolves structured folder workspaces and mounted repo sessions to the same project', () => {
+    const topGroup = makeProjectGroup({
+      id: 'group-platform',
+      name: 'Platform',
+      parentPath: '/Users/ada/Platform',
+      parentGroupId: null
+    })
+    const workspaceGroup = makeProjectGroup({
+      id: 'group-ws-one',
+      name: 'Workspace One',
+      parentPath: '/Users/ada/Platform/ws-one',
+      parentGroupId: topGroup.id
+    })
+    const folderWorkspace = makeFolderWorkspace({
+      id: 'folder-ws-one',
+      projectGroupId: workspaceGroup.id,
+      name: 'Workspace One',
+      folderPath: '/Users/ada/Platform/ws-one'
+    })
+    const repo = makeRepo({
+      id: 'repo-api',
+      displayName: 'API',
+      path: '/Users/ada/src/api',
+      projectGroupId: topGroup.id
+    })
+    const activeFolderWorktree = makeWorktree({
+      id: 'folder:folder-ws-one',
+      repoId: `folder-workspace:${workspaceGroup.id}`,
+      displayName: folderWorkspace.name,
+      path: folderWorkspace.folderPath,
+      branch: ''
+    })
+    const mountedRepoWorktree = makeWorktree({
+      id: 'repo-api::/Users/ada/Platform/ws-one/src/api',
+      repoId: repo.id,
+      path: '/Users/ada/Platform/ws-one/src/api',
+      branch: 'ws-one'
+    })
+    const session = makeSession({
+      id: 'claude:structured',
+      cwd: '/Users/ada/Platform/ws-one/src/api'
+    })
+
+    const context = buildAiVaultProjectContext({
+      repos: [repo],
+      worktrees: [activeFolderWorktree, mountedRepoWorktree],
+      folderWorkspaces: [folderWorkspace],
+      projectGroups: [topGroup, workspaceGroup],
+      projectHostSetupProjection: makeProjection({ projects: [], setups: [] }),
+      activeRepo: null,
+      activeWorktree: activeFolderWorktree,
+      sessions: [session]
+    })
+
+    expect(context.activeProjectKey).toBe('structured:local:/Users/ada/Platform')
+    expect(context.projectLabelByKey.get('structured:local:/Users/ada/Platform')).toBe('Platform')
+    expect(context.sessionProjectById.get(session.id)).toMatchObject({
+      kind: 'structured',
+      key: 'structured:local:/Users/ada/Platform',
+      label: 'Platform'
+    })
   })
 
   it('inherits setup host ids for legacy worktrees without host metadata', () => {
@@ -464,6 +534,41 @@ function makeProject(overrides: Partial<Project>): Project {
     displayName: 'Project',
     badgeColor: '#737373',
     sourceRepoIds: [],
+    createdAt: 1,
+    updatedAt: 1,
+    ...overrides
+  }
+}
+
+function makeProjectGroup(overrides: Partial<ProjectGroup>): ProjectGroup {
+  return {
+    id: 'group-1',
+    name: 'Project Group',
+    parentPath: '/Users/ada/project',
+    parentGroupId: null,
+    createdFrom: 'structured',
+    tabOrder: 0,
+    isCollapsed: false,
+    color: null,
+    createdAt: 1,
+    updatedAt: 1,
+    ...overrides
+  }
+}
+
+function makeFolderWorkspace(overrides: Partial<FolderWorkspace>): FolderWorkspace {
+  return {
+    id: 'folder-1',
+    projectGroupId: 'group-1',
+    name: 'Folder Workspace',
+    folderPath: '/Users/ada/project/workspace',
+    linkedTask: null,
+    comment: '',
+    isArchived: false,
+    isUnread: false,
+    isPinned: false,
+    sortOrder: 0,
+    lastActivityAt: 1,
     createdAt: 1,
     updatedAt: 1,
     ...overrides

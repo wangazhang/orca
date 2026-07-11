@@ -94,12 +94,22 @@ export default function AiVaultPanel(): React.JSX.Element {
       buildAiVaultProjectContext({
         repos,
         worktrees: allWorktrees,
+        folderWorkspaces: resumeTargetState.folderWorkspaces,
+        projectGroups: resumeTargetState.projectGroups,
         projectHostSetupProjection,
         activeRepo,
         activeWorktree,
         sessions: []
       }),
-    [activeRepo, activeWorktree, allWorktrees, projectHostSetupProjection, repos]
+    [
+      activeRepo,
+      activeWorktree,
+      allWorktrees,
+      projectHostSetupProjection,
+      repos,
+      resumeTargetState.folderWorkspaces,
+      resumeTargetState.projectGroups
+    ]
   )
   const activeProjectKey = projectScopeContext.activeProjectKey
   const projectLabelByKey = projectScopeContext.projectLabelByKey
@@ -108,9 +118,18 @@ export default function AiVaultPanel(): React.JSX.Element {
     () =>
       deriveAiVaultScopeSessionPaths(activeWorktree ?? null, allWorktrees, {
         activeProjectKey,
+        folderWorkspaces: resumeTargetState.folderWorkspaces,
+        projectGroups: resumeTargetState.projectGroups,
         projectHostSetupProjection
       }),
-    [activeProjectKey, activeWorktree, allWorktrees, projectHostSetupProjection]
+    [
+      activeProjectKey,
+      activeWorktree,
+      allWorktrees,
+      projectHostSetupProjection,
+      resumeTargetState.folderWorkspaces,
+      resumeTargetState.projectGroups
+    ]
   )
   const { error, loading, refresh, scanResult, sessions } = useAiVaultSessionRefresh(
     scopePaths,
@@ -121,12 +140,23 @@ export default function AiVaultPanel(): React.JSX.Element {
       buildAiVaultProjectContext({
         repos,
         worktrees: allWorktrees,
+        folderWorkspaces: resumeTargetState.folderWorkspaces,
+        projectGroups: resumeTargetState.projectGroups,
         projectHostSetupProjection,
         activeRepo,
         activeWorktree,
         sessions
       }).sessionProjectById,
-    [activeRepo, activeWorktree, allWorktrees, projectHostSetupProjection, repos, sessions]
+    [
+      activeRepo,
+      activeWorktree,
+      allWorktrees,
+      projectHostSetupProjection,
+      repos,
+      resumeTargetState.folderWorkspaces,
+      resumeTargetState.projectGroups,
+      sessions
+    ]
   )
   const sessionWorktreeById = useAiVaultSessionWorktreeMap({
     sessions,

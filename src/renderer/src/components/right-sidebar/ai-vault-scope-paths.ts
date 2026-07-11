@@ -3,8 +3,13 @@ import {
   normalizeRuntimePathForComparison
 } from '../../../../shared/cross-platform-path'
 import type { ProjectHostSetupProjection } from '../../../../shared/project-host-setup-projection'
-import type { Worktree } from '../../../../shared/types'
+import type { FolderWorkspace, ProjectGroup, Worktree } from '../../../../shared/types'
 import { splitWorktreeIdForFilesystem } from '../../../../shared/worktree-id'
+import {
+  buildAiVaultStructuredProjectScopes,
+  findAiVaultStructuredProjectScopeForWorktree,
+  isAiVaultWorktreeInsideStructuredProjectScope
+} from './ai-vault-structured-projects'
 
 export function deriveAiVaultWorkspaceScopePaths(
   activeWorktree: Pick<Worktree, 'id' | 'path' | 'priorWorktreeIds' | 'repoId'> | null,
@@ -45,6 +50,8 @@ export function deriveAiVaultScopeSessionPaths(
   liveWorktrees: readonly Pick<Worktree, 'id' | 'path' | 'projectId' | 'repoId'>[] = [],
   options: {
     activeProjectKey?: string | null
+    folderWorkspaces?: readonly FolderWorkspace[]
+    projectGroups?: readonly ProjectGroup[]
     projectHostSetupProjection?: ProjectHostSetupProjection
   } = {}
 ): string[] {
@@ -68,6 +75,21 @@ export function deriveAiVaultScopeSessionPaths(
     if (worktreeProjectKey(setup, setup) === options.activeProjectKey) {
       addAiVaultWorkspaceScopePath(paths, setup.path)
     }
+  }
+  const structuredScopes = buildAiVaultStructuredProjectScopes(
+    options.projectGroups,
+    options.folderWorkspaces
+  )
+  const activeStructuredScope =
+    structuredScopes.find((scope) => scope.key === options.activeProjectKey) ??
+    findAiVaultStructuredProjectScopeForWorktree(activeWorktree, structuredScopes)
+  if (activeStructuredScope) {
+    for (const worktree of liveWorktrees) {
+      if (isAiVaultWorktreeInsideStructuredProjectScope(worktree, activeStructuredScope)) {
+        addAiVaultWorkspaceScopePath(paths, worktree.path)
+      }
+    }
+    addAiVaultWorkspaceScopePath(paths, activeStructuredScope.rootPath)
   }
   return paths
 }

@@ -311,6 +311,33 @@ describe('filterAiVaultSessions', () => {
       }).map((session) => session.id)
     ).toEqual(['claude:1'])
   })
+
+  it('matches repo: queries against structured project labels', () => {
+    const sessionProjectById = new Map([
+      [
+        baseSession.id,
+        {
+          kind: 'structured' as const,
+          key: 'structured:local:/Users/ada/Platform',
+          label: 'Platform'
+        }
+      ]
+    ])
+    const projectLabelByKey = new Map([['structured:local:/Users/ada/Platform', 'Platform']])
+
+    expect(
+      filterAiVaultSessions([baseSession], {
+        query: 'repo:platform',
+        agents: ['claude'],
+        scope: 'all',
+        sort: 'updated',
+        activeWorktreePaths: [],
+        sessionProjectById,
+        projectLabelByKey,
+        hideEmptySessions: true
+      }).map((session) => session.id)
+    ).toEqual(['claude:1'])
+  })
 })
 
 describe('deriveAiVaultWorkspaceScopePaths', () => {
@@ -585,6 +612,94 @@ describe('deriveAiVaultScopeSessionPaths', () => {
       '/Users/ada/workspaces/orca/app',
       '/Users/ada/workspaces/orca/docs-worktree',
       '/Users/ada/workspaces/orca/docs'
+    ])
+  })
+
+  it('adds structured project root and workspace paths for folder-backed workspaces', () => {
+    expect(
+      deriveAiVaultScopeSessionPaths(
+        {
+          id: 'folder:folder-ws-one',
+          repoId: 'folder-workspace:group-ws-one',
+          path: '/Users/ada/Platform/ws-one',
+          priorWorktreeIds: []
+        },
+        [
+          {
+            id: 'repo-api::/Users/ada/Platform/ws-one/src/api',
+            repoId: 'repo-api',
+            path: '/Users/ada/Platform/ws-one/src/api'
+          },
+          {
+            id: 'repo-web::/Users/ada/Platform/ws-two/src/web',
+            repoId: 'repo-web',
+            path: '/Users/ada/Platform/ws-two/src/web'
+          }
+        ],
+        {
+          activeProjectKey: 'structured:local:/Users/ada/Platform',
+          folderWorkspaces: [
+            {
+              id: 'folder-ws-one',
+              projectGroupId: 'group-ws-one',
+              name: 'Workspace One',
+              folderPath: '/Users/ada/Platform/ws-one',
+              linkedTask: null,
+              comment: '',
+              isArchived: false,
+              isUnread: false,
+              isPinned: false,
+              sortOrder: 0,
+              lastActivityAt: 1,
+              createdAt: 1,
+              updatedAt: 1
+            }
+          ],
+          projectGroups: [
+            {
+              id: 'group-platform',
+              name: 'Platform',
+              parentPath: '/Users/ada/Platform',
+              parentGroupId: null,
+              createdFrom: 'structured',
+              tabOrder: 0,
+              isCollapsed: false,
+              color: null,
+              createdAt: 1,
+              updatedAt: 1
+            },
+            {
+              id: 'group-ws-one',
+              name: 'Workspace One',
+              parentPath: '/Users/ada/Platform/ws-one',
+              parentGroupId: 'group-platform',
+              createdFrom: 'structured',
+              tabOrder: 0,
+              isCollapsed: false,
+              color: null,
+              createdAt: 1,
+              updatedAt: 1
+            },
+            {
+              id: 'group-ws-two',
+              name: 'Workspace Two',
+              parentPath: '/Users/ada/Platform/ws-two',
+              parentGroupId: 'group-platform',
+              createdFrom: 'structured',
+              tabOrder: 1,
+              isCollapsed: false,
+              color: null,
+              createdAt: 1,
+              updatedAt: 1
+            }
+          ]
+        }
+      )
+    ).toEqual([
+      '/Users/ada/Platform/ws-one',
+      '/Users/ada/Platform/ws-one/src/api',
+      '/Users/ada/Platform/ws-two/src/web',
+      '/Users/ada/Platform'
     ])
   })
 })

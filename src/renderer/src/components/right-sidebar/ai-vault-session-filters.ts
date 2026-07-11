@@ -181,7 +181,7 @@ function matchesQuery(
 
   const sessionProject = filters.sessionProjectById?.get(session.id)
   const repoLabel = (
-    sessionProject?.kind === 'repo'
+    sessionProject && sessionProject.kind !== 'folder' && sessionProject.kind !== 'unknown'
       ? (filters.projectLabelByKey?.get(sessionProject.key) ?? sessionProject.label)
       : folderLabel(session.cwd)
   ).toLowerCase()

@@ -1,20 +1,32 @@
-import {
-  getRepoExecutionHostId,
-  LOCAL_EXECUTION_HOST_ID,
-  normalizeExecutionHostId,
-  type ExecutionHostId
-} from '../../../../shared/execution-host'
+import { normalizeExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
 import type { ProjectHostSetupProjection } from '../../../../shared/project-host-setup-projection'
 import type { AiVaultSession } from '../../../../shared/ai-vault-types'
-import type { ProjectHostSetup, Repo, Worktree } from '../../../../shared/types'
+import type {
+  FolderWorkspace,
+  ProjectGroup,
+  ProjectHostSetup,
+  Repo,
+  Worktree
+} from '../../../../shared/types'
 import {
   isPathInsideOrEqual,
   normalizeRuntimePathForComparison,
   normalizeRuntimePathSeparators
 } from '../../../../shared/cross-platform-path'
+import {
+  buildAiVaultStructuredProjectScopes,
+  findAiVaultStructuredProjectScopeForGroupId,
+  findAiVaultStructuredProjectScopeForWorktree,
+  type AiVaultStructuredProjectScope
+} from './ai-vault-structured-projects'
+import {
+  buildAiVaultSessionProjectCandidates,
+  compareAiVaultSessionProjectCandidates,
+  type AiVaultSessionProjectCandidate
+} from './ai-vault-session-project-candidates'
 
 export type AiVaultSessionProject = {
-  kind: 'repo' | 'folder' | 'unknown'
+  kind: 'repo' | 'structured' | 'folder' | 'unknown'
   key: string
   label: string
   projectId?: string
@@ -29,17 +41,11 @@ export type AiVaultProjectContext = {
   sessionProjectById: Map<string, AiVaultSessionProject>
 }
 
-type SessionProjectCandidate = {
-  source: 'worktree' | 'setup'
-  normalizedPath: string
-  hostKey: ExecutionHostId
-  projectId: string | null
-  repoId: string | null
-}
-
 type ProjectResolverArgs = {
   repos: readonly Repo[]
   worktrees: readonly Worktree[]
+  folderWorkspaces?: readonly FolderWorkspace[]
+  projectGroups?: readonly ProjectGroup[]
   projectHostSetupProjection: ProjectHostSetupProjection
   activeRepo: Repo | null
   activeWorktree: Worktree | null
@@ -49,6 +55,8 @@ type ProjectResolverArgs = {
 export function buildAiVaultProjectContext({
   repos,
   worktrees,
+  folderWorkspaces = [],
+  projectGroups = [],
   projectHostSetupProjection,
   activeRepo,
   activeWorktree,
@@ -56,13 +64,19 @@ export function buildAiVaultProjectContext({
 }: ProjectResolverArgs): AiVaultProjectContext {
   const repoById = new Map(repos.map((repo) => [repo.id, repo]))
   const setupByRepoId = buildSetupByRepoId(projectHostSetupProjection.setups)
-  const projectLabelByKey = buildProjectLabelByKey(repos, projectHostSetupProjection)
-  const candidates = buildProjectCandidates(
-    worktrees,
+  const structuredScopes = buildAiVaultStructuredProjectScopes(projectGroups, folderWorkspaces)
+  const projectLabelByKey = buildProjectLabelByKey(
+    repos,
     projectHostSetupProjection,
-    repoById,
-    setupByRepoId
+    structuredScopes
   )
+  const candidates = buildAiVaultSessionProjectCandidates({
+    worktrees,
+    projection: projectHostSetupProjection,
+    repoById,
+    setupByRepoId,
+    structuredScopes
+  })
   const sessionProjectById = new Map<string, AiVaultSessionProject>()
 
   for (const session of sessions) {
@@ -73,7 +87,12 @@ export function buildAiVaultProjectContext({
   }
 
   return {
-    activeProjectKey: resolveActiveProjectKey(activeRepo, activeWorktree, setupByRepoId),
+    activeProjectKey: resolveActiveProjectKey(
+      activeRepo,
+      activeWorktree,
+      setupByRepoId,
+      structuredScopes
+    ),
     activeRepoId: activeRepo?.id ?? activeWorktree?.repoId ?? null,
     projectLabelByKey,
     sessionProjectById
@@ -106,7 +125,8 @@ function buildSetupByRepoId(
 
 function buildProjectLabelByKey(
   repos: readonly Repo[],
-  projection: ProjectHostSetupProjection
+  projection: ProjectHostSetupProjection,
+  structuredScopes: readonly AiVaultStructuredProjectScope[] = []
 ): Map<string, string> {
   const labels = new Map<string, string>()
   const projectLabelById = new Map(
@@ -131,93 +151,16 @@ function buildProjectLabelByKey(
     }
   }
 
+  for (const scope of structuredScopes) {
+    labels.set(scope.key, scope.label)
+  }
+
   return labels
-}
-
-function buildProjectCandidates(
-  worktrees: readonly Worktree[],
-  projection: ProjectHostSetupProjection,
-  repoById: ReadonlyMap<string, Repo>,
-  setupByRepoId: ReadonlyMap<string, ProjectHostSetup>
-): SessionProjectCandidate[] {
-  const candidates: SessionProjectCandidate[] = []
-  const setupRepoIds = new Set<string>()
-
-  for (const worktree of worktrees) {
-    if (!hasCandidatePath(worktree.path)) {
-      continue
-    }
-    const repo = repoById.get(worktree.repoId)
-    const setup = setupByRepoId.get(worktree.repoId)
-    candidates.push({
-      source: 'worktree',
-      normalizedPath: normalizeRuntimePathForComparison(worktree.path),
-      hostKey: resolveCandidateHostId(
-        worktree.hostId,
-        setup?.hostId,
-        repo ? getRepoExecutionHostId(repo) : null
-      ),
-      projectId: worktree.projectId ?? setup?.projectId ?? null,
-      repoId: worktree.repoId
-    })
-  }
-
-  for (const setup of projection.setups) {
-    if (setup.repoId) {
-      if (hasCandidatePath(setup.path)) {
-        setupRepoIds.add(setup.repoId)
-      }
-    }
-    if (!hasCandidatePath(setup.path)) {
-      continue
-    }
-    candidates.push({
-      source: 'setup',
-      normalizedPath: normalizeRuntimePathForComparison(setup.path),
-      hostKey: resolveCandidateHostId(setup.hostId, getRepoExecutionHostId(setup)),
-      projectId: setup.projectId,
-      repoId: setup.repoId || null
-    })
-  }
-
-  for (const repo of repoById.values()) {
-    if (setupRepoIds.has(repo.id)) {
-      continue
-    }
-    if (!hasCandidatePath(repo.path)) {
-      continue
-    }
-    candidates.push({
-      source: 'setup',
-      normalizedPath: normalizeRuntimePathForComparison(repo.path),
-      hostKey: getRepoExecutionHostId(repo),
-      projectId: null,
-      repoId: repo.id
-    })
-  }
-
-  return candidates
-}
-
-function resolveCandidateHostId(
-  ...values: readonly (string | null | undefined)[]
-): ExecutionHostId {
-  for (const value of values) {
-    const hostId = normalizeExecutionHostId(value)
-    if (hostId) {
-      return hostId
-    }
-  }
-  return LOCAL_EXECUTION_HOST_ID
-}
-
-function hasCandidatePath(pathValue: string): boolean {
-  return pathValue.trim().length > 0
 }
 
 function resolveSessionProject(
   session: AiVaultSession,
-  candidates: readonly SessionProjectCandidate[],
+  candidates: readonly AiVaultSessionProjectCandidate[],
   projectLabelByKey: ReadonlyMap<string, string>
 ): AiVaultSessionProject {
   const cwd = session.cwd
@@ -243,9 +186,18 @@ function resolveSessionProject(
     return folderProject(cwd)
   }
 
-  const bestCandidate = hostMatches.sort(compareCandidates)[0]
+  const bestCandidate = hostMatches.sort(compareAiVaultSessionProjectCandidates)[0]
   if (!bestCandidate) {
     return folderProject(cwd)
+  }
+
+  if (bestCandidate.key) {
+    return {
+      kind: 'structured',
+      key: bestCandidate.key,
+      label: projectLabelByKey.get(bestCandidate.key) ?? bestCandidate.label ?? bestCandidate.key,
+      hostKey: bestCandidate.hostKey
+    }
   }
 
   const key = toAiVaultProjectKey(bestCandidate.projectId, bestCandidate.repoId)
@@ -261,17 +213,6 @@ function resolveSessionProject(
     ...(bestCandidate.repoId ? { repoId: bestCandidate.repoId } : {}),
     hostKey: bestCandidate.hostKey
   }
-}
-
-function compareCandidates(left: SessionProjectCandidate, right: SessionProjectCandidate): number {
-  const lengthDifference = right.normalizedPath.length - left.normalizedPath.length
-  if (lengthDifference !== 0) {
-    return lengthDifference
-  }
-  if (left.source === right.source) {
-    return 0
-  }
-  return left.source === 'worktree' ? -1 : 1
 }
 
 function folderProject(cwd: string): AiVaultSessionProject {
@@ -294,8 +235,16 @@ function compactFolderLabel(pathValue: string): string {
 function resolveActiveProjectKey(
   activeRepo: Repo | null,
   activeWorktree: Worktree | null,
-  setupByRepoId: ReadonlyMap<string, ProjectHostSetup>
+  setupByRepoId: ReadonlyMap<string, ProjectHostSetup>,
+  structuredScopes: readonly AiVaultStructuredProjectScope[] = []
 ): string | null {
+  const activeStructuredScope =
+    findAiVaultStructuredProjectScopeForGroupId(activeRepo?.projectGroupId, structuredScopes) ??
+    findAiVaultStructuredProjectScopeForWorktree(activeWorktree, structuredScopes)
+  if (activeStructuredScope) {
+    return activeStructuredScope.key
+  }
+
   if (activeWorktree?.projectId) {
     return toAiVaultProjectKey(activeWorktree.projectId, activeWorktree.repoId)
   }
