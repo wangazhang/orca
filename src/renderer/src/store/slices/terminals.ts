@@ -2879,6 +2879,16 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
       for (const workspace of s.folderWorkspaces) {
         validWorktreeIds.add(folderWorkspaceKey(workspace.id))
       }
+      // Why: authoritative git scans also detect worktrees hidden from the
+      // sidebar (structured `src/` leaves under a `hide` repo). Include the
+      // detected superset — same rule the startup purge uses — so a restart does
+      // not drop their persisted terminal/agent sessions before the purge can
+      // protect them. Mirrors collectSessionHydrationValidWorktreeIds.
+      for (const detected of Object.values(s.detectedWorktreesByRepo)) {
+        for (const worktree of detected.worktrees) {
+          validWorktreeIds.add(worktree.id)
+        }
+      }
       addAdditionalValidWorkspaceKeys(validWorktreeIds, options)
       for (const worktreeId of Object.keys(session.tabsByWorktree)) {
         const parsedWorkspaceKey = parseWorkspaceKey(worktreeId)

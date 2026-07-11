@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: sidebar row construction keeps every grouping mode in one pure module so reveal, virtualized rendering, and tests share the same flat row contract. */
-import { Boxes, CircleX, FolderTree, List, Pin } from 'lucide-react'
+import { Boxes, CircleX, FolderGit2, FolderTree, List, Pin } from 'lucide-react'
 import type React from 'react'
 import type {
   DetectedWorktree,
@@ -72,6 +72,10 @@ export type WorktreeRow = {
   lineageGroupKey?: string
   lineageCollapsed?: boolean
   hostContextLabel?: string
+  // When set, the card shows this label instead of the worktree's own title and
+  // suppresses inline rename. Used for structured leaf rows, where the row stands
+  // in for its mounted repo (the branch/worktree name is redundant there).
+  titleOverride?: string
 }
 
 export type ImportedWorktreesCardCandidate = {
@@ -155,6 +159,58 @@ export function isStructuredWorkspaceGroup(group: ProjectGroup): boolean {
 // each workspace.
 function getStructuredRepoSectionKey(workspaceGroupId: string, repoId: string): string {
   return `${STRUCTURED_REPO_SECTION_PREFIX}:${workspaceGroupId}:${repoId}`
+}
+
+// True for the synthesized per-repo section keys above. The render uses this to
+// drop repo-section chrome that makes no sense under a structured project (the
+// create-worktree "+": workspace scaffolding already made the mounts).
+export function isStructuredRepoSectionKey(key: string): boolean {
+  return key.startsWith(`${STRUCTURED_REPO_SECTION_PREFIX}:`)
+}
+
+const STRUCTURED_REPOS_FOLDER_PREFIX = 'struct-repos-folder'
+
+// The unified "Repositories" folder wraps a structured workspace's mounted src
+// repos in one collapsible node so expanding a workspace does not dump every repo
+// and worktree at once. Keyed per workspace group so each workspace folds its
+// repos independently.
+export function getStructuredReposFolderKey(workspaceGroupId: string): string {
+  return `${STRUCTURED_REPOS_FOLDER_PREFIX}:${workspaceGroupId}`
+}
+
+export function isStructuredReposFolderKey(key: string): boolean {
+  return key.startsWith(`${STRUCTURED_REPOS_FOLDER_PREFIX}:`)
+}
+
+// Inverted default: unlike every other header (an absent key means expanded), the
+// repos folder is collapsed by default, so a key present in collapsedGroups means
+// the user expanded it. Centralized so buildRows and the render agree.
+export function isStructuredReposFolderCollapsed(
+  key: string,
+  collapsedGroups: ReadonlySet<string>
+): boolean {
+  return !collapsedGroups.has(key)
+}
+
+// FolderGit2 marks the node as a repo folder rather than a plain folder.
+export const STRUCTURED_REPOS_FOLDER_META = {
+  tone: 'text-foreground',
+  icon: FolderGit2
+} as const
+
+// Every repos-folder key, for callers that need a fully-expanded layout (e.g.
+// keyboard cycling): because the folder's collapse sense is inverted, "expanded"
+// requires the key to be present rather than absent.
+export function getAllStructuredReposFolderKeys(
+  projectGroups: readonly ProjectGroup[]
+): Set<string> {
+  const keys = new Set<string>()
+  for (const group of projectGroups) {
+    if (isStructuredWorkspaceGroup(group)) {
+      keys.add(getStructuredReposFolderKey(group.id))
+    }
+  }
+  return keys
 }
 
 // A worktree belongs to a structured workspace when its path sits under the
@@ -581,6 +637,7 @@ function buildWorktreeRow(
     lineageChildCount: number
     lineageCollapsed: boolean
     hostContextLabel?: string
+    titleOverride?: string
   }
 ): WorktreeRow {
   return {
@@ -595,6 +652,7 @@ function buildWorktreeRow(
     isLastLineageChild: options.isLastLineageChild,
     lineageChildCount: options.lineageChildCount,
     ...(options.hostContextLabel ? { hostContextLabel: options.hostContextLabel } : {}),
+    ...(options.titleOverride ? { titleOverride: options.titleOverride } : {}),
     ...(options.lineageChildCount > 0 ? { lineageGroupKey: getLineageGroupKey(worktree.id) } : {}),
     ...(options.lineageChildCount > 0 ? { lineageCollapsed: options.lineageCollapsed } : {})
   }
@@ -1296,6 +1354,42 @@ export function buildRows(
     )
   }
 
+  // Inside an expanded "Repositories" folder, a mounted repo that has exactly the
+  // one same-named worktree the workspace scaffolding created renders as a single
+  // clickable leaf row (its repo name as the title) — no section header, no
+  // redundant worktree child. A repo that somehow has multiple worktrees (e.g. an
+  // extra one added via CLI) falls back to the normal collapsible section so none
+  // of its worktrees become unreachable.
+  const appendStructuredRepoEntries = (
+    entries: OrderedGroupEntry[],
+    projectGroupDepth: number
+  ): void => {
+    const leaves: OrderedGroupEntry[] = []
+    const sections: OrderedGroupEntry[] = []
+    for (const entry of entries) {
+      ;(entry[1].items.length === 1 ? leaves : sections).push(entry)
+    }
+    for (const [key, group] of leaves) {
+      const worktree = group.items[0]!
+      result.push(
+        buildWorktreeRow(worktree, repoMap, {
+          rowKey: `${key}:${worktree.id}`,
+          sectionKey: key,
+          depth: 0,
+          groupDepth: projectGroupDepth,
+          lineageTrail: [],
+          isLastLineageChild: false,
+          lineageChildCount: 0,
+          lineageCollapsed: false,
+          titleOverride: group.label
+        })
+      )
+    }
+    if (sections.length > 0) {
+      appendOrderedGroups(sections, projectGroupDepth)
+    }
+  }
+
   const appendProjectGroup = (projectGroup: ProjectGroup, depth: number): void => {
     const repoEntries = sortRepoEntriesWithinGroup(groupByProjectGroupId.get(projectGroup.id) ?? [])
     const childGroups = childGroupsByParentId.get(projectGroup.id) ?? []
@@ -1354,7 +1448,27 @@ export function buildRows(
             ]
           )
           .sort((left, right) => left[1].label.localeCompare(right[1].label))
-        appendOrderedGroups(structuredEntries, depth + 1)
+        // Wrap the per-repo sections in one collapsible "Repositories" folder
+        // (default collapsed) so a workspace with many mounted repos stays tidy.
+        // Skip the folder entirely when no repos are mounted yet.
+        if (structuredEntries.length > 0) {
+          const reposFolderKey = getStructuredReposFolderKey(projectGroup.id)
+          result.push({
+            type: 'header',
+            key: reposFolderKey,
+            // Literal 'src' (not localized): the folder mirrors the on-disk
+            // <workspace>/src/ directory, so its name should match that path
+            // verbatim in every locale.
+            label: 'src',
+            count: structuredEntries.length,
+            tone: STRUCTURED_REPOS_FOLDER_META.tone,
+            icon: STRUCTURED_REPOS_FOLDER_META.icon,
+            projectGroupDepth: depth + 1
+          })
+          if (!isStructuredReposFolderCollapsed(reposFolderKey, collapsedGroups)) {
+            appendStructuredRepoEntries(structuredEntries, depth + 2)
+          }
+        }
       } else {
         appendOrderedGroups(withRepoSectionDisplayLabels(repoEntries), depth + 1)
       }
@@ -1471,6 +1585,7 @@ export function getGroupKeysForWorktree(
       return [
         ...groupIds.map((id) => getProjectGroupHeaderKey(id)),
         getProjectGroupHeaderKey(workspaceGroup.id),
+        getStructuredReposFolderKey(workspaceGroup.id),
         getStructuredRepoSectionKey(workspaceGroup.id, worktree.repoId)
       ]
     }

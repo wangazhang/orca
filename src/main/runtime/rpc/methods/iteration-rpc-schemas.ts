@@ -8,7 +8,12 @@ import { structuredServiceKindSchema } from '../../../../shared/structured-proje
 export const IterationCreate = z.object({
   name: requiredString('Missing project name'),
   services: z.array(structuredServiceKindSchema).default([]),
-  rootPath: OptionalString
+  // Full project root. Takes precedence when set.
+  rootPath: OptionalString,
+  // Parent directory to create the project under (root becomes
+  // <parentDir>/<name>). Lets the UI pass just a location and keep the
+  // cross-platform path join in main. Ignored when rootPath is set.
+  parentDir: OptionalString
 })
 
 export const IterationWorkspaceCreate = z.object({

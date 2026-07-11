@@ -4132,7 +4132,9 @@
           "structuredAddWorkspace": "New workspace in {{value0}}",
           "structuredMountRepo": "Mount repository into {{value0}}",
           "workspaceSettings": "Workspace settings",
-          "copyWorkspace": "Copy workspace"
+          "copyWorkspace": "Copy workspace",
+          "mountRepoMenuItem": "Mount repository",
+          "revealGroupFolder": "Open in {{value0}}"
         },
         "WorktreeMetaDialog": {
           "3db0a2a593": "Cancel",
@@ -4331,7 +4333,8 @@
               "682ed5d551": "Closed",
               "7c2f009786": "In progress",
               "6798dc7c94": "In review",
-              "5076efc3d2": "Done"
+              "5076efc3d2": "Done",
+              "repositoriesFolder": "Repositories"
             }
           }
         },
@@ -4545,7 +4548,10 @@
           "repoPendingBadge": "pending",
           "removePendingRepo": "Remove",
           "dropRepoHint": "…or drop a local Git folder here",
-          "notGitRepo": "Not a Git repository"
+          "notGitRepo": "Not a Git repository",
+          "locationLabel": "Location",
+          "browse": "Browse…",
+          "locationHint": "Leave empty to use the default (~/orca/projects)."
         },
         "CopyWorkspaceDialog": {
           "title": "Copy workspace",

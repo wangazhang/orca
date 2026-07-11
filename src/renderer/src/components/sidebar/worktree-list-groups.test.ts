@@ -9,6 +9,7 @@ import {
   buildRows,
   getGroupKeyForWorktree,
   getGroupKeysForWorktree,
+  getAllStructuredReposFolderKeys,
   getLineageGroupKey,
   getLineageRenderInfo,
   getPRGroupKey,
@@ -3371,48 +3372,114 @@ describe('buildRows — structured projects', () => {
     )
   }
 
-  it('renders one workspace subgroup per workspace, each with only its own branch worktree, and no ungrouped duplicate', () => {
-    const rows = buildStructuredRows()
+  const bothReposFoldersExpanded = new Set(['struct-repos-folder:ws1', 'struct-repos-folder:ws2'])
 
-    // The shared repo must NOT appear as its own top-level/ungrouped repo header.
-    const structRepoHeaderKeys = rows
-      .filter((row) => row.type === 'header' && row.key.startsWith('struct-repo:'))
+  it('wraps each workspace in a repos folder; expanded shows each mounted repo as a leaf row', () => {
+    const rows = buildStructuredRows(bothReposFoldersExpanded)
+
+    // Each workspace gets its own collapsible "src" folder.
+    const folderKeys = rows
+      .filter((row) => row.type === 'header' && row.key.startsWith('struct-repos-folder:'))
       .map((row) => (row.type === 'header' ? row.key : ''))
-    expect(structRepoHeaderKeys).toHaveLength(2)
-    expect(structRepoHeaderKeys.sort()).toEqual([
-      'struct-repo:ws1:repo-mrs',
-      'struct-repo:ws2:repo-mrs'
-    ])
+    expect(folderKeys.sort()).toEqual(['struct-repos-folder:ws1', 'struct-repos-folder:ws2'])
 
-    // Each worktree appears exactly once, under its own workspace section.
+    // A 1:1 mount renders as a single leaf worktree row — no per-repo section
+    // header, and no ungrouped top-level repo header for the shared repo.
+    expect(rows.some((row) => row.type === 'header' && row.key.startsWith('struct-repo:'))).toBe(
+      false
+    )
+
+    // Each worktree appears exactly once, as a leaf whose title is the repo name.
     const itemRows = rows.filter((row) => row.type === 'item')
     expect(itemRows).toHaveLength(2)
     const ws1Item = itemRows.find((row) => row.type === 'item' && row.worktree.id === wt1.id)
     const ws2Item = itemRows.find((row) => row.type === 'item' && row.worktree.id === wt2.id)
     expect(ws1Item?.type === 'item' && ws1Item.sectionKey).toBe('struct-repo:ws1:repo-mrs')
     expect(ws2Item?.type === 'item' && ws2Item.sectionKey).toBe('struct-repo:ws2:repo-mrs')
+    // The leaf stands in for the mounted repo, so its visible title is the repo
+    // folder name ("mrs"), not the redundant per-workspace branch/worktree name.
+    expect(ws1Item?.type === 'item' && ws1Item.titleOverride).toBe('mrs')
+    expect(ws2Item?.type === 'item' && ws2Item.titleOverride).toBe('mrs')
   })
 
-  it('collapsing a workspace group hides its struct-repo sections and worktrees', () => {
-    const rows = buildStructuredRows(new Set([getProjectGroupHeaderKey('ws1')]))
-    // ws1's subtree is hidden; ws2 still shows its worktree.
-    expect(
-      rows.some((row) => row.type === 'header' && row.key === 'struct-repo:ws1:repo-mrs')
-    ).toBe(false)
+  it('collapses the repos folder by default, hiding the mounted repos until expanded', () => {
+    const rows = buildStructuredRows()
+
+    // The folder headers still render so the user can expand them...
+    expect(rows.some((row) => row.type === 'header' && row.key === 'struct-repos-folder:ws1')).toBe(
+      true
+    )
+    // ...but their mounted-repo leaf rows are tucked away by default.
+    expect(rows.some((row) => row.type === 'header' && row.key.startsWith('struct-repo:'))).toBe(
+      false
+    )
+    expect(rows.some((row) => row.type === 'item')).toBe(false)
+  })
+
+  it('expanding one repos folder reveals only that workspace mount', () => {
+    const rows = buildStructuredRows(new Set(['struct-repos-folder:ws1']))
+    expect(rows.some((row) => row.type === 'item' && row.worktree.id === wt1.id)).toBe(true)
+    expect(rows.some((row) => row.type === 'item' && row.worktree.id === wt2.id)).toBe(false)
+  })
+
+  it('collapsing a workspace group hides its repos folder and mount', () => {
+    // ws2's folder expanded so its mount is still visible; ws1 collapsed at the
+    // workspace level hides its whole subtree regardless of folder state.
+    const rows = buildStructuredRows(
+      new Set([getProjectGroupHeaderKey('ws1'), 'struct-repos-folder:ws2'])
+    )
+    expect(rows.some((row) => row.type === 'header' && row.key === 'struct-repos-folder:ws1')).toBe(
+      false
+    )
     expect(rows.some((row) => row.type === 'item' && row.worktree.id === wt1.id)).toBe(false)
     expect(rows.some((row) => row.type === 'item' && row.worktree.id === wt2.id)).toBe(true)
   })
 
-  it('collapsing a struct-repo section hides just that worktree', () => {
-    const rows = buildStructuredRows(new Set(['struct-repo:ws1:repo-mrs']))
+  it('falls back to a collapsible section when a mounted repo has multiple worktrees', () => {
+    // A repo with an extra CLI-added worktree must not become a single leaf (that
+    // would hide the second worktree); it keeps a header + child rows instead.
+    const wt1Extra: Worktree = {
+      ...wt1,
+      id: 'repo-mrs::/root/penguin-x/workspace-1/src/mrs-hotfix',
+      path: '/root/penguin-x/workspace-1/src/mrs-hotfix',
+      branch: 'refs/heads/workspace-1-hotfix',
+      displayName: 'workspace-1-hotfix'
+    }
+    const rows = buildRows(
+      'repo',
+      [wt1, wt1Extra, wt2],
+      structuredRepoMap,
+      null,
+      bothReposFoldersExpanded,
+      undefined,
+      undefined,
+      'manual',
+      {},
+      undefined,
+      false,
+      undefined,
+      structuredGroups
+    )
+    // ws1's repo (2 worktrees) keeps a section header; its rows are not leaves.
     expect(
       rows.some((row) => row.type === 'header' && row.key === 'struct-repo:ws1:repo-mrs')
     ).toBe(true)
-    expect(rows.some((row) => row.type === 'item' && row.worktree.id === wt1.id)).toBe(false)
-    expect(rows.some((row) => row.type === 'item' && row.worktree.id === wt2.id)).toBe(true)
+    const ws1Items = rows.filter(
+      (row) => row.type === 'item' && row.sectionKey === 'struct-repo:ws1:repo-mrs'
+    )
+    expect(ws1Items).toHaveLength(2)
+    expect(ws1Items.every((row) => row.type === 'item' && row.titleOverride === undefined)).toBe(
+      true
+    )
+    // ws2's repo is still 1:1, so it stays a leaf with no section header.
+    expect(
+      rows.some((row) => row.type === 'header' && row.key === 'struct-repo:ws2:repo-mrs')
+    ).toBe(false)
+    const ws2Item = rows.find((row) => row.type === 'item' && row.worktree.id === wt2.id)
+    expect(ws2Item?.type === 'item' && ws2Item.titleOverride).toBe('mrs')
   })
 
-  it('getGroupKeysForWorktree returns the workspace group and struct-repo keys for reveal', () => {
+  it('getGroupKeysForWorktree returns the workspace group, repos folder, and struct-repo keys for reveal', () => {
     const keys = getGroupKeysForWorktree(
       'repo',
       wt1,
@@ -3424,9 +3491,17 @@ describe('buildRows — structured projects', () => {
     )
     expect(keys).toContain(getProjectGroupHeaderKey('top'))
     expect(keys).toContain(getProjectGroupHeaderKey('ws1'))
+    expect(keys).toContain('struct-repos-folder:ws1')
     expect(keys).toContain('struct-repo:ws1:repo-mrs')
-    // Must not leak the sibling workspace's key.
+    // Must not leak the sibling workspace's keys.
+    expect(keys).not.toContain('struct-repos-folder:ws2')
     expect(keys).not.toContain('struct-repo:ws2:repo-mrs')
+  })
+
+  it('getAllStructuredReposFolderKeys lists one folder key per workspace group only', () => {
+    const keys = getAllStructuredReposFolderKeys(structuredGroups)
+    // Top group is not a workspace group, so it has no repos folder.
+    expect([...keys].sort()).toEqual(['struct-repos-folder:ws1', 'struct-repos-folder:ws2'])
   })
 
   it('leaves a normal (non-structured) project group on the unchanged code path', () => {

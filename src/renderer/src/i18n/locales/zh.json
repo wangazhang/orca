@@ -4090,7 +4090,9 @@
           "structuredAddWorkspace": "在 {{value0}} 中新建工作区",
           "structuredMountRepo": "将仓库挂载到 {{value0}}",
           "workspaceSettings": "Workspace settings",
-          "copyWorkspace": "Copy workspace"
+          "copyWorkspace": "Copy workspace",
+          "mountRepoMenuItem": "挂载仓库",
+          "revealGroupFolder": "在 {{value0}} 中打开"
         },
         "WorktreeMetaDialog": {
           "3db0a2a593": "取消",
@@ -4289,7 +4291,8 @@
               "682ed5d551": "已关闭",
               "7c2f009786": "进行中",
               "6798dc7c94": "评审中",
-              "5076efc3d2": "完成"
+              "5076efc3d2": "完成",
+              "repositoriesFolder": "仓库"
             }
           }
         },
@@ -4539,13 +4542,16 @@
           "createProjectOnly": "仅创建项目",
           "createAndAddWorkspace": "创建并添加工作空间",
           "skipWorkspace": "跳过",
-          "workspaceTitleMore": "Create a workspace",
-          "workspaceDescriptionMore": "Add another iteration: its own sandbox ports and repo worktrees.",
-          "repoNewBadge": "new",
-          "repoPendingBadge": "pending",
-          "removePendingRepo": "Remove",
-          "dropRepoHint": "…or drop a local Git folder here",
-          "notGitRepo": "Not a Git repository"
+          "workspaceTitleMore": "创建工作空间",
+          "workspaceDescriptionMore": "再添加一次迭代：拥有独立的沙箱端口与仓库 worktree。",
+          "repoNewBadge": "新",
+          "repoPendingBadge": "待挂载",
+          "removePendingRepo": "移除",
+          "dropRepoHint": "…或将本地 Git 目录拖到此处",
+          "notGitRepo": "不是 Git 仓库",
+          "locationLabel": "位置",
+          "browse": "浏览…",
+          "locationHint": "留空则使用默认位置（~/orca/projects）。"
         },
         "CopyWorkspaceDialog": {
           "title": "Copy workspace",

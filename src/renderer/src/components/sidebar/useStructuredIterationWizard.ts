@@ -7,6 +7,7 @@ import type { StructuredServiceKind } from '../../../../shared/structured-projec
 import { translate } from '@/i18n/i18n'
 import { useIterationRepos } from './useIterationRepos'
 import type { MountedRepoView, ReposDropHandlers } from './useIterationRepos'
+import { revealStructuredReposFolders } from './structured-repos-folder-reveal'
 
 export type { MountedRepoView, PendingRepo, ReposDropHandlers } from './useIterationRepos'
 
@@ -28,6 +29,9 @@ export type StructuredIterationWizard = {
   step: WizardStep
   projectName: string
   setProjectName: (value: string) => void
+  projectRoot: string
+  setProjectRoot: (value: string) => void
+  handlePickProjectRoot: () => void
   services: Set<StructuredServiceKind>
   toggleService: (kind: StructuredServiceKind) => void
   workspaceName: string
@@ -72,6 +76,9 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
   const seededWorkspace = typeof modalData.workspace === 'string' ? modalData.workspace : ''
   const [step, setStep] = useState<WizardStep>(() => readStartStep(modalData.startAt))
   const [projectName, setProjectName] = useState(seededProject)
+  // Parent directory for the new project root. Empty = let the backend use its
+  // default (~/orca/projects). Only meaningful when creating a fresh project.
+  const [projectRoot, setProjectRoot] = useState('')
   const [services, setServices] = useState<Set<StructuredServiceKind>>(new Set())
   const [workspaceName, setWorkspaceName] = useState(seededWorkspace)
   const [busy, setBusy] = useState(false)
@@ -89,6 +96,19 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
   const [projectIsNew] = useState(() => readStartStep(modalData.startAt) === 'project')
 
   const clearError = useCallback(() => setError(null), [])
+
+  // Browse for a parent directory; leaving it empty keeps the backend default.
+  // Reuses the same folder picker the repo-mount flow uses.
+  const handlePickProjectRoot = useCallback(async () => {
+    if (busy) {
+      return
+    }
+    const dir = await window.api.repos.pickDirectory()
+    if (dir && mountedRef.current) {
+      setProjectRoot(dir)
+      clearError()
+    }
+  }, [busy, clearError, mountedRef])
 
   // The repos step's state and native folder-drop wiring live in a focused hook;
   // the wizard only orchestrates the step flow and the deferred mount on Done.
@@ -174,13 +194,18 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
         return
       }
       try {
-        await callRuntimeRpc(target, 'iteration.materialize', { project })
+        const materializeResult = (await callRuntimeRpc(target, 'iteration.materialize', {
+          project
+        })) as { result?: { workspaceGroupIds?: string[] } }
         // Refresh in the same order App.tsx uses at startup: repos → groups →
         // folder workspaces → worktrees (worktrees enumerate over repos).
         await fetchReposForAllHosts()
         await fetchProjectGroupsForAllHosts()
         await fetchFolderWorkspacesForAllHosts()
         await fetchAllWorktrees()
+        // Reveal each workspace's default-collapsed "src" folder so just-mounted
+        // repos show instead of hiding inside it.
+        revealStructuredReposFolders(materializeResult.result?.workspaceGroupIds ?? [])
       } catch (err) {
         if (mountedRef.current) {
           setError(err instanceof Error ? err.message : String(err))
@@ -227,7 +252,10 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
           'iteration.create',
           {
             name,
-            services: [...services]
+            services: [...services],
+            // Empty = backend default (~/orca/projects). The backend joins
+            // parentDir + name into the full root.
+            parentDir: projectRoot.trim() || undefined
           }
         )
         created = result.project.name
@@ -251,7 +279,7 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
         await runMaterializeAndClose(created)
       }
     },
-    [busy, mountedRef, projectName, runMaterializeAndClose, services, target]
+    [busy, mountedRef, projectName, projectRoot, runMaterializeAndClose, services, target]
   )
 
   const handleCreateWorkspace = useCallback(async () => {
@@ -305,6 +333,9 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
     step,
     projectName,
     setProjectName,
+    projectRoot,
+    setProjectRoot,
+    handlePickProjectRoot,
     services,
     toggleService,
     workspaceName,

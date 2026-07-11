@@ -53,6 +53,7 @@ import {
   addAdditionalValidWorkspaceKeys,
   type WorkspaceSessionHydrationOptions
 } from '@/lib/workspace-session-hydration-keys'
+import { collectSessionHydrationValidWorktreeIds } from './session-hydration-valid-worktree-ids'
 
 type CreateBrowserTabOptions = {
   activate?: boolean
@@ -1547,16 +1548,7 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
       const persistedPagesByWorkspace = session.browserPagesByWorkspace ?? {}
       const persistedActiveBrowserTabIdByWorktree = session.activeBrowserTabIdByWorktree ?? {}
       const persistedActiveTabTypeByWorktree = session.activeTabTypeByWorktree ?? {}
-      const validWorktreeIds = new Set(
-        Object.values(s.worktreesByRepo)
-          .flat()
-          .map((worktree) => worktree.id)
-      )
-      validWorktreeIds.add(FLOATING_TERMINAL_WORKTREE_ID)
-      for (const workspace of s.folderWorkspaces) {
-        validWorktreeIds.add(folderWorkspaceKey(workspace.id))
-      }
-      addAdditionalValidWorkspaceKeys(validWorktreeIds, options)
+      const validWorktreeIds = collectSessionHydrationValidWorktreeIds(s, options)
 
       const browserTabsByWorktree: Record<string, BrowserWorkspace[]> = {}
       const browserPagesByWorkspace: Record<string, BrowserPage[]> = {}

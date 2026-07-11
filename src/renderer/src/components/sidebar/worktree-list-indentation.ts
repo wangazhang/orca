@@ -102,9 +102,22 @@ export function getFolderWorkspaceCardSurfaceInset(args: {
   return Math.min(genericSurfaceInset, Math.max(0, maxSurfaceInset))
 }
 
+// Why: structured-project leaf rows (a mounted repo's single worktree under
+// <workspace>/src/) are direct children of the compact "src" folder header.
+// The generic grouped-worktree indent nests them a full extra tree step deeper
+// than their siblings (the workspace overview card), pushing content ~74px in.
+// Anchor them to the same folder-workspace step so they read as one tidy indent
+// under "src" instead. Structured-only: reached solely for struct-repo leaves.
+// Surface inset is 0 (see getFolderWorkspaceRowGeometry): the card box sits
+// flush to the sidebar edge and this content step alone expresses the nesting.
+export function getStructuredLeafWorktreeCardContentIndent(args: { groupDepth: number }): number {
+  return getFolderWorkspaceCardContentIndent({ groupDepth: args.groupDepth })
+}
+
 export function getFolderWorkspaceRowGeometry(args: {
   experimentalNewWorktreeCardStyle: boolean
   isFolderBackedWorkspaceChild: boolean
+  isStructuredWorkspaceChild: boolean
   isGrouped: boolean
   groupDepth: number
   lineageDepth: number
@@ -112,6 +125,16 @@ export function getFolderWorkspaceRowGeometry(args: {
   surfaceInset: number
   cardContentIndent: number
 } {
+  // Why: a structured workspace's overview card sits flush to the sidebar edge
+  // (surface inset 0), with the compact folder-workspace content step alone
+  // expressing its nesting — matching the src-leaf cards rendered under it.
+  if (args.isStructuredWorkspaceChild) {
+    return {
+      surfaceInset: 0,
+      cardContentIndent: getFolderWorkspaceCardContentIndent({ groupDepth: args.groupDepth })
+    }
+  }
+
   if (args.experimentalNewWorktreeCardStyle && args.isFolderBackedWorkspaceChild) {
     // Why: standalone folder workspace rows do not get a lineage wrapper
     // offset, so align them to the comparable folder-backed repo row anchor.

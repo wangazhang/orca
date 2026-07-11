@@ -37,7 +37,6 @@ import type {
 } from '../../../../shared/types'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import { clampMarkdownTocPanelWidth } from '../../../../shared/markdown-toc-panel-width'
-import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
 import type { RemoteOpKind } from '@/components/right-sidebar/source-control-primary-action'
 import { invalidateAutomaticPushTargetUpstreamStatusCache } from '@/components/right-sidebar/push-target-upstream-refresh-cache'
 import {
@@ -62,10 +61,8 @@ import { settingsForRuntimeOwner } from '@/runtime/runtime-rpc-client'
 import { notifyHostOfMirroredEditorClose } from '@/runtime/close-mirrored-editor-tab'
 import { findWorktreeById, getRepoIdFromWorktreeId } from './worktree-helpers'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
-import {
-  addAdditionalValidWorkspaceKeys,
-  type WorkspaceSessionHydrationOptions
-} from '@/lib/workspace-session-hydration-keys'
+import type { WorkspaceSessionHydrationOptions } from '@/lib/workspace-session-hydration-keys'
+import { collectSessionHydrationValidWorktreeIds } from './session-hydration-valid-worktree-ids'
 import { createUntitledMarkdownFileWithTemplateSelection } from '@/lib/create-untitled-markdown'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import { translate } from '@/i18n/i18n'
@@ -4239,16 +4236,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       // Why: worktrees may have been deleted between sessions. Filter out
       // files for worktrees that no longer exist, mirroring the validation
       // that hydrateWorkspaceSession performs for terminal tabs.
-      const validWorktreeIds = new Set(
-        Object.values(s.worktreesByRepo)
-          .flat()
-          .map((w) => w.id)
-      )
-      validWorktreeIds.add(FLOATING_TERMINAL_WORKTREE_ID)
-      for (const workspace of s.folderWorkspaces) {
-        validWorktreeIds.add(folderWorkspaceKey(workspace.id))
-      }
-      addAdditionalValidWorkspaceKeys(validWorktreeIds, options)
+      const validWorktreeIds = collectSessionHydrationValidWorktreeIds(s, options)
 
       const openFiles: OpenFile[] = []
       const editorDrafts: Record<string, string> = {}

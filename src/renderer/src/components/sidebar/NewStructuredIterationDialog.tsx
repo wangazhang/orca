@@ -1,5 +1,5 @@
 import React from 'react'
-import { Boxes, Check, FolderPlus, Loader2, X } from 'lucide-react'
+import { Boxes, Check, FolderOpen, FolderPlus, Loader2, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,9 @@ const NewStructuredIterationDialog = React.memo(function NewStructuredIterationD
     step,
     projectName,
     setProjectName,
+    projectRoot,
+    setProjectRoot,
+    handlePickProjectRoot,
     services,
     toggleService,
     workspaceName,
@@ -117,6 +120,45 @@ const NewStructuredIterationDialog = React.memo(function NewStructuredIterationD
                   clearError()
                 }}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="structured-iteration-location">
+                {translate(
+                  'auto.components.sidebar.NewStructuredIterationDialog.locationLabel',
+                  'Location'
+                )}
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="structured-iteration-location"
+                  value={projectRoot}
+                  placeholder="~/orca/projects"
+                  disabled={busy}
+                  onChange={(e) => {
+                    setProjectRoot(e.target.value)
+                    clearError()
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  disabled={busy}
+                  onClick={handlePickProjectRoot}
+                  aria-label={translate(
+                    'auto.components.sidebar.NewStructuredIterationDialog.browse',
+                    'Browse…'
+                  )}
+                >
+                  <FolderOpen className="size-4" />
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {translate(
+                  'auto.components.sidebar.NewStructuredIterationDialog.locationHint',
+                  'Leave empty to use the default (~/orca/projects).'
+                )}
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label>

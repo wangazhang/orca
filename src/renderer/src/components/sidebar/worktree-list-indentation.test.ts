@@ -18,6 +18,7 @@ import {
   getLineageEffectiveChildStart,
   getLineageNestedRowGeometry,
   getProjectGroupHeaderPaddingLeft,
+  getStructuredLeafWorktreeCardContentIndent,
   getWorktreeCardContentIndent,
   getWorktreeCardSurfaceInset
 } from './worktree-list-indentation'
@@ -90,10 +91,39 @@ describe('worktree list indentation', () => {
     expect(getFolderWorkspaceCardSurfaceInset({ isGrouped: false, groupDepth: 2 })).toBe(0)
   })
 
+  it('keeps structured leaf rows one compact step under their src folder', () => {
+    // The workspace group sits at header depth 1; its "src" folder header at
+    // depth 2 (padL 30). A structured leaf under src carries groupDepth 3. The
+    // generic grouped indent would nest it at 74px — this anchors it to 40px,
+    // a single 10px step under the src header, matching the overview card step.
+    expect(getStructuredLeafWorktreeCardContentIndent({ groupDepth: 3 })).toBe(40)
+    // Sanity: markedly tighter than the generic grouped leaf it replaces.
+    expect(getStructuredLeafWorktreeCardContentIndent({ groupDepth: 3 })).toBeLessThan(
+      getWorktreeCardContentIndent({ isGrouped: true, groupDepth: 3, lineageDepth: 0 })
+    )
+  })
+
+  it('renders structured workspace overview cards flush to the sidebar edge', () => {
+    // The overview card is a direct child of the workspace group (groupDepth 2).
+    // Surface inset 0 pins the card box to the sidebar edge; the compact
+    // folder-workspace content step (30px) alone expresses its nesting, matching
+    // the src-leaf cards under it.
+    const geometry = getFolderWorkspaceRowGeometry({
+      experimentalNewWorktreeCardStyle: true,
+      isFolderBackedWorkspaceChild: false,
+      isStructuredWorkspaceChild: true,
+      isGrouped: true,
+      groupDepth: 2,
+      lineageDepth: 0
+    })
+    expect(geometry).toEqual({ surfaceInset: 0, cardContentIndent: 30 })
+  })
+
   it('preserves legacy folder-scanned folder workspace row geometry', () => {
     const geometry = getFolderWorkspaceRowGeometry({
       experimentalNewWorktreeCardStyle: false,
       isFolderBackedWorkspaceChild: true,
+      isStructuredWorkspaceChild: false,
       isGrouped: true,
       groupDepth: 1,
       lineageDepth: 0
@@ -110,6 +140,7 @@ describe('worktree list indentation', () => {
     const geometry = getFolderWorkspaceRowGeometry({
       experimentalNewWorktreeCardStyle: false,
       isFolderBackedWorkspaceChild: true,
+      isStructuredWorkspaceChild: false,
       isGrouped: true,
       groupDepth: 2,
       lineageDepth: 0
@@ -126,6 +157,7 @@ describe('worktree list indentation', () => {
     const geometry = getFolderWorkspaceRowGeometry({
       experimentalNewWorktreeCardStyle: false,
       isFolderBackedWorkspaceChild: false,
+      isStructuredWorkspaceChild: false,
       isGrouped: true,
       groupDepth: 1,
       lineageDepth: 0
@@ -142,6 +174,7 @@ describe('worktree list indentation', () => {
     const geometry = getFolderWorkspaceRowGeometry({
       experimentalNewWorktreeCardStyle: true,
       isFolderBackedWorkspaceChild: true,
+      isStructuredWorkspaceChild: false,
       isGrouped: true,
       groupDepth: 1,
       lineageDepth: 0
@@ -158,6 +191,7 @@ describe('worktree list indentation', () => {
     const geometry = getFolderWorkspaceRowGeometry({
       experimentalNewWorktreeCardStyle: true,
       isFolderBackedWorkspaceChild: true,
+      isStructuredWorkspaceChild: false,
       isGrouped: true,
       groupDepth: 4,
       lineageDepth: 3
@@ -174,6 +208,7 @@ describe('worktree list indentation', () => {
     const geometry = getFolderWorkspaceRowGeometry({
       experimentalNewWorktreeCardStyle: true,
       isFolderBackedWorkspaceChild: false,
+      isStructuredWorkspaceChild: false,
       isGrouped: true,
       groupDepth: 1,
       lineageDepth: 0
@@ -190,6 +225,7 @@ describe('worktree list indentation', () => {
     const geometry = getFolderWorkspaceRowGeometry({
       experimentalNewWorktreeCardStyle: true,
       isFolderBackedWorkspaceChild: false,
+      isStructuredWorkspaceChild: false,
       isGrouped: false,
       groupDepth: 3,
       lineageDepth: 0

@@ -36,12 +36,20 @@ const storeState = {
   fetchReposForAllHosts: fetchReposMock,
   fetchProjectGroupsForAllHosts: fetchGroupsMock,
   fetchFolderWorkspacesForAllHosts: fetchFolderWorkspacesMock,
-  fetchAllWorktrees: fetchWorktreesMock
+  fetchAllWorktrees: fetchWorktreesMock,
+  collapsedGroups: new Set<string>(),
+  toggleCollapsedGroup: vi.fn()
 }
 
-vi.mock('@/store', () => ({
-  useAppStore: (selector: (s: typeof storeState) => unknown) => selector(storeState)
-}))
+vi.mock('@/store', () => {
+  const useAppStore = ((selector: (s: typeof storeState) => unknown) => selector(storeState)) as ((
+    selector: (s: typeof storeState) => unknown
+  ) => unknown) & {
+    getState: () => typeof storeState
+  }
+  useAppStore.getState = () => storeState
+  return { useAppStore }
+})
 vi.mock('@/runtime/runtime-rpc-client', () => ({
   callRuntimeRpc: callRuntimeRpcMock,
   getActiveRuntimeTarget: () => ({ kind: 'local' as const })

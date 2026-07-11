@@ -181,7 +181,8 @@ export const PROJECT_RUNTIME_METHODS: RpcMethod[] = [
       project: createStructuredProjectService({
         name: params.name,
         services: params.services,
-        rootPath: params.rootPath
+        rootPath: params.rootPath,
+        parentDir: params.parentDir
       })
     })
   }),

@@ -33,12 +33,8 @@ import { buildHydratedTabState, pruneTabGroupLayoutForGroups } from './tabs-hydr
 import { buildOrphanTerminalCleanupPatch, getOrphanTerminalIds } from './terminal-orphan-helpers'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
-import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
-import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
-import {
-  addAdditionalValidWorkspaceKeys,
-  type WorkspaceSessionHydrationOptions
-} from '@/lib/workspace-session-hydration-keys'
+import { collectSessionHydrationValidWorktreeIds } from './session-hydration-valid-worktree-ids'
+import type { WorkspaceSessionHydrationOptions } from '@/lib/workspace-session-hydration-keys'
 
 export type TabSplitDirection = 'left' | 'right' | 'up' | 'down'
 
@@ -2055,16 +2051,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
 
   hydrateTabsSession: (session, options) => {
     const state = get()
-    const validWorktreeIds = new Set(
-      Object.values(state.worktreesByRepo)
-        .flat()
-        .map((w) => w.id)
-    )
-    validWorktreeIds.add(FLOATING_TERMINAL_WORKTREE_ID)
-    for (const workspace of state.folderWorkspaces) {
-      validWorktreeIds.add(folderWorkspaceKey(workspace.id))
-    }
-    addAdditionalValidWorkspaceKeys(validWorktreeIds, options)
+    const validWorktreeIds = collectSessionHydrationValidWorktreeIds(state, options)
     set(buildHydratedTabState(session, validWorktreeIds))
   }
 })

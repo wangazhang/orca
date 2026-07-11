@@ -66,8 +66,12 @@ export function createStructuredProjectService(params: {
   name: string
   services: StructuredServiceKind[]
   rootPath?: string
+  parentDir?: string
 }): StructuredProjectSummary {
-  const rootPath = params.rootPath ?? join(getProjectsDir(), params.name)
+  // rootPath wins as the full root; otherwise create under parentDir (or the
+  // default projects dir) as <parent>/<name>. join keeps separators correct
+  // across platforms.
+  const rootPath = params.rootPath ?? join(params.parentDir ?? getProjectsDir(), params.name)
   const created = createStructuredProject({
     name: params.name,
     rootPath,
