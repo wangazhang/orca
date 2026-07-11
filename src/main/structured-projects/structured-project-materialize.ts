@@ -10,9 +10,11 @@
 // disk paths, so startup sync and wizard-finish can both trigger it safely.
 import { areRuntimePathsEqual } from '../../shared/worktree-ownership'
 import {
+  buildStructuredProjectMaterializationView,
   getStructuredProjectMaterializationView,
-  listStructuredProjectsService
+  type StructuredProjectMaterializationView
 } from './structured-project-service'
+import { scanAllStructuredProjects } from './structured-project-scan'
 import type { FolderWorkspace, ProjectGroup, Repo, WorktreeMeta } from '../../shared/types'
 
 // Minimal slice of OrcaRuntimeService the materializer needs — declared here so
@@ -99,8 +101,19 @@ export async function materializeStructuredProject(
   runtime: MaterializeRuntime,
   idOrName: string
 ): Promise<MaterializeResult> {
-  const view = getStructuredProjectMaterializationView(idOrName)
+  return materializeStructuredProjectFromView(
+    runtime,
+    getStructuredProjectMaterializationView(idOrName)
+  )
+}
 
+// The core projection, taking an already-read view so callers that scanned in
+// bulk (materializeAll) don't re-resolve each project by name (which would be a
+// second full-directory scan per project — O(N²) at startup).
+async function materializeStructuredProjectFromView(
+  runtime: MaterializeRuntime,
+  view: StructuredProjectMaterializationView
+): Promise<MaterializeResult> {
   const topGroup = await ensureStructuredGroup(runtime, {
     name: view.name,
     parentPath: view.rootPath,
@@ -158,15 +171,17 @@ export async function materializeStructuredProject(
 
 // Materializes every structured project found on disk. Fail-soft per project so
 // one malformed project never blocks the rest (mirrors scanStructuredProjects).
+// Scans once and builds each view from that scan — never re-resolves per project.
 export async function materializeAllStructuredProjects(
   runtime: MaterializeRuntime
 ): Promise<MaterializeResult[]> {
   const results: MaterializeResult[] = []
-  for (const project of listStructuredProjectsService()) {
+  for (const scanned of scanAllStructuredProjects()) {
     try {
-      results.push(await materializeStructuredProject(runtime, project.name))
+      const view = buildStructuredProjectMaterializationView(scanned)
+      results.push(await materializeStructuredProjectFromView(runtime, view))
     } catch (error) {
-      console.error(`Failed to materialize structured project "${project.name}":`, error)
+      console.error(`Failed to materialize structured project "${scanned.project.name}":`, error)
     }
   }
   return results

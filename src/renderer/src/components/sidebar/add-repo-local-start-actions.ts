@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { Boxes, FolderOpen, Globe, Monitor, Plus } from 'lucide-react'
+import { FolderOpen, Globe, Monitor, Plus } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 
 export type AddRepoLocalStartActionHandlers = {
@@ -7,14 +7,13 @@ export type AddRepoLocalStartActionHandlers = {
   onOpenCloneStep: () => void
   onOpenRemoteStep: () => void
   onOpenCreateStep: () => void
-  onOpenStructuredIteration: () => void
   showRemoteAction?: boolean
   canCreateProject?: boolean
   browseHostKind?: 'local' | 'ssh' | 'runtime'
 }
 
 export type AddRepoLocalStartAction = {
-  kind: 'browse' | 'clone' | 'remote' | 'create' | 'iteration'
+  kind: 'browse' | 'clone' | 'remote' | 'create'
   icon: ComponentType<{ className?: string }>
   title: string
   description: string
@@ -28,7 +27,6 @@ export function getAddRepoLocalStartActions({
   onOpenCloneStep,
   onOpenRemoteStep,
   onOpenCreateStep,
-  onOpenStructuredIteration,
   showRemoteAction = true,
   canCreateProject = true,
   browseHostKind = 'local'
@@ -113,29 +111,14 @@ export function getAddRepoLocalStartActions({
     onClick: onOpenCreateStep
   }
 
-  // Structured iteration: an on-disk project root (doc + isolated sandbox +
-  // multiple git-worktree repos), distinct from the derived-projection projects
-  // the other actions create. Always offered — it scaffolds under ~/orca/projects.
-  const iteration = {
-    kind: 'iteration' as const,
-    icon: Boxes,
-    title: translate(
-      'auto.components.sidebar.add.repo.local.start.actions.structuredIterationTitle',
-      'Structured iteration'
-    ),
-    description: translate(
-      'auto.components.sidebar.add.repo.local.start.actions.structuredIterationDescription',
-      'Iteration root with docs, an isolated sandbox, and multiple repos'
-    ),
-    onClick: onOpenStructuredIteration
-  }
-
+  // Structured projects are chosen one level up (the kind step), so they are no
+  // longer mixed into this repository-source list.
   const baseSecondaryActions = showRemoteAction
     ? isSshLikely
       ? [remote, clone, create]
       : [clone, remote, create]
     : [clone, create]
-  const secondaryActions = [...baseSecondaryActions, iteration]
+  const secondaryActions = baseSecondaryActions
 
   return { primaryAction, secondaryActions }
 }

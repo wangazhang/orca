@@ -3,6 +3,8 @@ import { CloneStep } from './AddRepoCloneStep'
 import { RemoteStep } from './AddRepoRemoteStep'
 import { CreateStep } from './AddRepoCreateStep'
 import { AddRepoLocalStartStep } from './AddRepoStartSteps'
+import { AddRepoKindStep } from './AddRepoKindStep'
+import { AddRepoStructuredStep } from './AddRepoStructuredStep'
 import { AddRepoServerPathStartStep } from './AddRepoServerStartStep'
 import { AddRepoNestedImportStep } from './AddRepoNestedImportStep'
 import type { AddRepoDialogStep } from './add-repo-dialog-types'
@@ -56,6 +58,9 @@ type AddRepoDialogStepContentProps = {
   onOpenCloneStep: () => void
   onOpenCreateStep: () => void
   onOpenStructuredIteration: () => void
+  onOpenStructuredImport: () => void
+  onSelectKindNormal: () => void
+  onSelectKindStructured: () => void
   onOpenRemoteStep: (targetId?: string | null) => void
   onStopNestedScan: () => void
   onServerPathChange: (path: string) => void
@@ -126,6 +131,9 @@ export function AddRepoDialogStepContent({
   onOpenCloneStep,
   onOpenCreateStep,
   onOpenStructuredIteration,
+  onOpenStructuredImport,
+  onSelectKindNormal,
+  onSelectKindStructured,
   onOpenRemoteStep,
   onStopNestedScan,
   onServerPathChange,
@@ -149,6 +157,22 @@ export function AddRepoDialogStepContent({
   onPickCreateParent,
   onCreate
 }: AddRepoDialogStepContentProps): React.JSX.Element | null {
+  if (step === 'kind') {
+    return (
+      <AddRepoKindStep
+        repoCount={repoCount}
+        onSelectNormal={onSelectKindNormal}
+        onSelectStructured={onSelectKindStructured}
+      />
+    )
+  }
+
+  if (step === 'structured') {
+    return (
+      <AddRepoStructuredStep onNew={onOpenStructuredIteration} onImport={onOpenStructuredImport} />
+    )
+  }
+
   if (step === 'add') {
     return (
       <AddRepoLocalStartStep
@@ -166,7 +190,6 @@ export function AddRepoDialogStepContent({
         onOpenCloneStep={onOpenCloneStep}
         onOpenRemoteStep={onOpenRemoteStep}
         onOpenCreateStep={onOpenCreateStep}
-        onOpenStructuredIteration={onOpenStructuredIteration}
         onStopNestedScan={onStopNestedScan}
       />
     )
