@@ -130,6 +130,9 @@ type WorktreeCardProps = {
   nativeDragEnabled?: boolean
   affiliateListMode?: boolean
   statusPrDisplay?: WorktreeCardPrDisplay | null
+  // Forces the visible title (and disables inline rename) — used by structured
+  // leaf rows that stand in for their mounted repo rather than a named worktree.
+  titleOverride?: string
 }
 
 const EMPTY_WORKSPACE_PORTS = []
@@ -222,7 +225,8 @@ const WorktreeCard = React.memo(function WorktreeCard({
   onLineageToggle,
   isLineageDropTarget = false,
   affiliateListMode = false,
-  statusPrDisplay = null
+  statusPrDisplay = null,
+  titleOverride
 }: WorktreeCardProps) {
   const openModal = useAppStore((s) => s.openModal)
   const openTaskPage = useAppStore((s) => s.openTaskPage)
@@ -604,7 +608,14 @@ const WorktreeCard = React.memo(function WorktreeCard({
     reviewTitle: prDisplay?.title
   })
   const legacyCardTitleDisplay = coerceWorktreeCardVisibleTitle(worktree.displayName)
-  const visibleCardTitle = newCardStyle ? cardTitleDisplay : legacyCardTitleDisplay
+  // titleOverride wins outright: structured leaf rows show the repo name and are
+  // not renameable, so it also gates the inline-rename affordance below.
+  const hasTitleOverride = typeof titleOverride === 'string' && titleOverride.length > 0
+  const visibleCardTitle = hasTitleOverride
+    ? titleOverride
+    : newCardStyle
+      ? cardTitleDisplay
+      : legacyCardTitleDisplay
   const isDeleting = deleteState?.isDeleting ?? false
   const deleteModifierPressed = useWorkspaceDeleteModifierPressed()
 
@@ -1478,20 +1489,23 @@ const WorktreeCard = React.memo(function WorktreeCard({
                  read titles carry scan contrast in the title row. */}
             <WorktreeTitleInlineRename
               displayName={visibleCardTitle}
-              disabled={isDeleting || affiliateListMode}
+              disabled={isDeleting || affiliateListMode || hasTitleOverride}
               showUnreadEmphasis={showUnreadEmphasis}
               dimReadTitle={newCardStyle}
               className="text-[13px] leading-5"
               editingClassName="flex-1"
               titleWrapper={titleWrapper}
-              onEditingChange={affiliateListMode ? undefined : setTitleRenaming}
+              onEditingChange={affiliateListMode || hasTitleOverride ? undefined : setTitleRenaming}
               onRename={handleRenameTitle}
               beginEditing={
                 !affiliateListMode &&
+                !hasTitleOverride &&
                 shouldBeginWorktreeRename(renamingWorktreeId, worktree.id, renameRowKey)
               }
               onBeginEditingConsumed={
-                affiliateListMode ? undefined : () => setRenamingWorktreeId(null)
+                affiliateListMode || hasTitleOverride
+                  ? undefined
+                  : () => setRenamingWorktreeId(null)
               }
             />
 

@@ -172,6 +172,51 @@ describe('buildWorktreeAgentRows', () => {
     expect(rows[0].agentType).toBe('omp')
   })
 
+  it('renders a live launched agent row when hooks and runtime titles are absent', () => {
+    const rows = buildWorktreeAgentRows({
+      tabs: [makeTab('tab-1', { launchAgent: 'claude', title: 'Terminal 1' })],
+      entries: [],
+      retained: [],
+      ptyIdsByTabId: {
+        'tab-1': ['pty-1']
+      },
+      terminalLayoutsByTabId: {
+        'tab-1': makeSinglePaneLayout(LEAF_ID_1)
+      },
+      now: 2000
+    })
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      paneKey: PANE_KEY_1,
+      agentType: 'claude',
+      rowSource: 'live',
+      state: 'idle'
+    })
+    expect(rows[0].entry).toMatchObject({
+      agentType: 'claude',
+      prompt: 'Claude Code',
+      terminalTitle: 'Claude Code'
+    })
+  })
+
+  it('does not render a launched agent fallback row after the tab title returns to a shell', () => {
+    const rows = buildWorktreeAgentRows({
+      tabs: [makeTab('tab-1', { launchAgent: 'claude', title: 'zsh' })],
+      entries: [],
+      retained: [],
+      ptyIdsByTabId: {
+        'tab-1': ['pty-1']
+      },
+      terminalLayoutsByTabId: {
+        'tab-1': makeSinglePaneLayout(LEAF_ID_1)
+      },
+      now: 2000
+    })
+
+    expect(rows).toEqual([])
+  })
+
   it('resolves retained unknown rows from the launched tab agent', () => {
     const retained = makeRetained(ORPHAN_PANE_KEY, 'wt-1', 1000, {
       entry: makeEntry(ORPHAN_PANE_KEY, 1000, {

@@ -2868,11 +2868,16 @@ export function useIpcEvents(): void {
         repoConnectionResolved,
         owningWorktreeId
       } = resolvePaneKey(store, data.paneKey)
-      if (!exists && data.worktreeId && hasRuntimeBackedWorktreeAttribution(data)) {
-        // Why: orchestration worker hooks can carry main-side worktree
-        // attribution before this renderer has a terminal tab for the pane.
-        // Require runtime identity too; durable snapshots with only worktreeId
-        // can be stale cached rows from closed/remounted panes.
+      if (
+        !exists &&
+        data.worktreeId &&
+        owningWorktreeId === undefined &&
+        canUseWorktreeAttributionForMissingPane(data, options)
+      ) {
+        // Why: hook pushes can carry main-side worktree attribution before
+        // this renderer has a terminal tab for the pane. Snapshot replay stays
+        // stricter because main's durable cache can contain stale rows from
+        // closed/remounted panes.
         const fallbackOwnership = resolveWorktreeConnection(store, data.worktreeId)
         if (fallbackOwnership.worktreeExists) {
           owningWorktreeId = data.worktreeId
@@ -3265,6 +3270,22 @@ function hasRuntimeBackedWorktreeAttribution(data: AgentStatusIpcPayload): boole
     (typeof data.terminalHandle === 'string' && data.terminalHandle.length > 0) ||
     data.orchestration !== undefined
   )
+}
+
+function canUseWorktreeAttributionForMissingPane(
+  data: AgentStatusIpcPayload,
+  options?: { replay?: boolean; retry?: boolean }
+): boolean {
+  if (hasRuntimeBackedWorktreeAttribution(data)) {
+    return true
+  }
+  if (options?.replay === true) {
+    return false
+  }
+  // Why: local hook pushes are explicitly stamped `connectionId: null` by
+  // main. Requiring a present stamp keeps hot-reload/preload skew from
+  // bypassing the SSH ownership check below.
+  return data.connectionId !== undefined
 }
 
 function tryMakePaneKey(tabId: string, leafId: string): string | null {

@@ -199,13 +199,7 @@ export function buildExplicitEntriesByTabId(
   migrationUnsupportedByPtyId?: Record<string, MigrationUnsupportedPtyEntry>
 ): Map<string, AgentStatusEntry[]> {
   const byTab = new Map<string, AgentStatusEntry[]>()
-  const entries = [
-    ...Object.values(agentStatusByPaneKey ?? {}),
-    ...Object.values(migrationUnsupportedByPtyId ?? {}).flatMap((entry) => {
-      const agentEntry = migrationUnsupportedToAgentStatusEntry(entry)
-      return agentEntry ? [agentEntry] : []
-    })
-  ]
+  const entries = getExplicitAgentEntries(agentStatusByPaneKey, migrationUnsupportedByPtyId)
   if (entries.length === 0) {
     return byTab
   }
@@ -224,6 +218,39 @@ export function buildExplicitEntriesByTabId(
     }
   }
   return byTab
+}
+
+function buildExplicitEntriesByAttributedWorktreeId(
+  agentStatusByPaneKey: Record<string, AgentStatusEntry> | undefined,
+  migrationUnsupportedByPtyId?: Record<string, MigrationUnsupportedPtyEntry>
+): Map<string, AgentStatusEntry[]> {
+  const byWorktree = new Map<string, AgentStatusEntry[]>()
+  const entries = getExplicitAgentEntries(agentStatusByPaneKey, migrationUnsupportedByPtyId)
+  for (const entry of entries) {
+    if (!entry.worktreeId || !parsePaneKey(entry.paneKey)) {
+      continue
+    }
+    const bucket = byWorktree.get(entry.worktreeId)
+    if (bucket) {
+      bucket.push(entry)
+    } else {
+      byWorktree.set(entry.worktreeId, [entry])
+    }
+  }
+  return byWorktree
+}
+
+function getExplicitAgentEntries(
+  agentStatusByPaneKey: Record<string, AgentStatusEntry> | undefined,
+  migrationUnsupportedByPtyId?: Record<string, MigrationUnsupportedPtyEntry>
+): AgentStatusEntry[] {
+  return [
+    ...Object.values(agentStatusByPaneKey ?? {}),
+    ...Object.values(migrationUnsupportedByPtyId ?? {}).flatMap((entry) => {
+      const agentEntry = migrationUnsupportedToAgentStatusEntry(entry)
+      return agentEntry ? [agentEntry] : []
+    })
+  ]
 }
 
 /**
@@ -258,15 +285,23 @@ export function buildAttentionByWorktree(
   terminalLayoutsByTabId?: Record<string, TerminalLayoutSnapshot>
 ): Map<string, WorktreeAttention> {
   const byTab = buildExplicitEntriesByTabId(agentStatusByPaneKey, migrationUnsupportedByPtyId)
+  const byAttributedWorktree = buildExplicitEntriesByAttributedWorktreeId(
+    agentStatusByPaneKey,
+    migrationUnsupportedByPtyId
+  )
   const result = new Map<string, WorktreeAttention>()
 
   for (const worktree of worktrees) {
-    const tabs = tabsByWorktree?.[worktree.id]
-    if (!tabs || tabs.length === 0) {
-      result.set(worktree.id, IDLE)
-      continue
-    }
+    const tabs = tabsByWorktree?.[worktree.id] ?? []
+    const tabIds = new Set(tabs.map((tab) => tab.id))
     const panes: PaneInput[] = []
+    for (const entry of byAttributedWorktree.get(worktree.id) ?? []) {
+      const parsed = parsePaneKey(entry.paneKey)
+      if (!parsed || tabIds.has(parsed.tabId)) {
+        continue
+      }
+      panes.push({ kind: 'hook', entry })
+    }
     for (const tab of tabs) {
       const hookEntries = byTab.get(tab.id)
       // Why: leaf ids covered by a hook entry skip the title fallback so we

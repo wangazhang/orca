@@ -56,6 +56,7 @@ function makeEntry(overrides: Partial<AgentStatusEntry> & { paneKey: string }): 
     stateStartedAt: overrides.stateStartedAt ?? overrides.updatedAt ?? NOW - 30_000,
     agentType: overrides.agentType ?? 'codex',
     paneKey: overrides.paneKey,
+    worktreeId: overrides.worktreeId,
     terminalTitle: overrides.terminalTitle,
     stateHistory: overrides.stateHistory ?? [],
     interrupted: overrides.interrupted
@@ -446,6 +447,26 @@ describe('buildAttentionByWorktree', () => {
       NOW
     )
     expect(map.get(w.id)).toEqual(IDLE)
+  })
+
+  it('attributes missing-tab live hook entries by worktreeId', () => {
+    const w = makeWorktree('wt-1')
+    const entry = makeEntry({
+      paneKey: paneKey('tab-missing', LEAF_1),
+      worktreeId: w.id,
+      state: 'working',
+      stateStartedAt: NOW - 10_000,
+      updatedAt: NOW - 1_000
+    })
+    const map = buildAttentionByWorktree(
+      [w],
+      { [w.id]: [] },
+      { [entry.paneKey]: entry },
+      {},
+      {},
+      NOW
+    )
+    expect(map.get(w.id)).toEqual({ cls: 3, attentionTimestamp: NOW - 10_000 })
   })
 
   it('title-heuristic Class 1: hookless pane with permission title → Class 1 with ts = now', () => {

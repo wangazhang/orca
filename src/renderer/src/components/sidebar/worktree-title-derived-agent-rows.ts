@@ -18,6 +18,7 @@ import {
   normalizeCompatibleAgentTitleForOwner,
   resolveCompatibleAgentTypeForOwner
 } from '../../../../shared/agent-title-owner'
+import { buildLaunchAgentFallbackRow } from './worktree-launch-agent-fallback-row'
 
 const EMPTY_RUNTIME_TITLES: Record<string, Record<number, string>> = {}
 const EMPTY_LIVE_PTY_IDS: Record<string, string[]> = {}
@@ -68,6 +69,7 @@ export function buildTitleDerivedAgentRows(args: {
         ? Object.entries(paneTitles).sort(([a], [b]) => Number(a) - Number(b))
         : []
 
+    let hasTabRow = false
     if (paneTitleEntries.length > 0) {
       for (const [paneId, title] of paneTitleEntries) {
         const leafId = resolveLeafIdForTitleFallback({
@@ -91,8 +93,11 @@ export function buildTitleDerivedAgentRows(args: {
         }
         rows.push(row)
         args.seenPaneKeys.add(row.paneKey)
+        hasTabRow = true
       }
-      continue
+      if (hasTabRow) {
+        continue
+      }
     }
 
     const leafId = layout?.activeLeafId ?? collectLeafIds(layout?.root ?? null)[0]
@@ -107,6 +112,17 @@ export function buildTitleDerivedAgentRows(args: {
       runtimeAgentOrchestrationByPaneKey: args.runtimeAgentOrchestrationByPaneKey
     })
     if (!row || args.seenPaneKeys.has(row.paneKey)) {
+      const launchRow = buildLaunchAgentFallbackRow({
+        tab,
+        leafId,
+        now: args.now,
+        runtimeAgentOrchestrationByPaneKey: args.runtimeAgentOrchestrationByPaneKey
+      })
+      if (!launchRow || args.seenPaneKeys.has(launchRow.paneKey)) {
+        continue
+      }
+      rows.push(launchRow)
+      args.seenPaneKeys.add(launchRow.paneKey)
       continue
     }
     rows.push(row)
