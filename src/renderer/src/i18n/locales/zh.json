@@ -3764,7 +3764,9 @@
           "5c9c7c16aa": "添加项目以创建工作区",
           "ca6f729da2": "新工作区 ({{value0}})",
           "a30e34eb5c": "关闭工作区板",
-          "25a95899c9": "添加项目"
+          "25a95899c9": "添加项目",
+          "sidebarTitleProjects": "项目",
+          "sidebarTitleWorkspaces": "工作区"
         },
         "SidebarNav": {
           "80611a8b10": "搜索",
@@ -4573,6 +4575,30 @@
           "save": "Save",
           "notGitFolder": "That folder is not a Git repository.",
           "savedTitle": "Workspace updated"
+        },
+        "AddRepoKindStep": {
+          "title": "添加项目",
+          "description": "你要添加哪种项目？",
+          "normalTitle": "仓库型项目",
+          "normalDescription": "打开、克隆或新建单个 Git 仓库或文件夹",
+          "structuredTitle": "结构化项目",
+          "structuredDescription": "多个仓库，含文档和隔离沙箱"
+        },
+        "AddRepoStructuredStep": {
+          "title": "结构化项目",
+          "description": "一个包含文档、隔离沙箱和多个仓库的项目根目录。",
+          "newTitle": "新建结构化项目",
+          "newDescription": "搭建全新的项目根目录及其首个工作空间",
+          "importTitle": "导入结构化项目",
+          "importDescription": "注册一个已有的项目文件夹（含 project.json）"
+        },
+        "StructuredImportDialog": {
+          "title": "导入结构化项目",
+          "description": "选择一个已有的项目文件夹（其中包含 project.json）。",
+          "rootLabel": "项目文件夹",
+          "rootPlaceholder": "选择一个文件夹…",
+          "browse": "浏览…",
+          "import": "导入"
         }
       },
       "shared": {

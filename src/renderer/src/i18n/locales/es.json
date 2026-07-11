@@ -3783,7 +3783,9 @@
           "5c9c7c16aa": "Agregar un proyecto para crear espacios de trabajo",
           "ca6f729da2": "Nuevo espacio de trabajo ({{value0}})",
           "a30e34eb5c": "Cerrar tablero del espacio de trabajo",
-          "25a95899c9": "Agregar proyecto"
+          "25a95899c9": "Agregar proyecto",
+          "sidebarTitleProjects": "Proyectos",
+          "sidebarTitleWorkspaces": "Espacios de trabajo"
         },
         "SidebarNav": {
           "80611a8b10": "Buscar",
@@ -4573,6 +4575,30 @@
           "save": "Save",
           "notGitFolder": "That folder is not a Git repository.",
           "savedTitle": "Workspace updated"
+        },
+        "AddRepoKindStep": {
+          "title": "Agregar un proyecto",
+          "description": "¿Qué tipo de proyecto quieres agregar?",
+          "normalTitle": "Proyecto de repositorio",
+          "normalDescription": "Abre, clona o crea un único repositorio de Git o carpeta",
+          "structuredTitle": "Proyecto estructurado",
+          "structuredDescription": "Múltiples repositorios con documentación y un entorno aislado"
+        },
+        "AddRepoStructuredStep": {
+          "title": "Proyecto estructurado",
+          "description": "Una raíz de proyecto con documentación, un entorno aislado y múltiples repositorios.",
+          "newTitle": "Nuevo proyecto estructurado",
+          "newDescription": "Crea una nueva raíz de proyecto y su primer espacio de trabajo",
+          "importTitle": "Importar proyecto estructurado",
+          "importDescription": "Registra una carpeta de proyecto existente (con project.json)"
+        },
+        "StructuredImportDialog": {
+          "title": "Importar proyecto estructurado",
+          "description": "Elige una carpeta de proyecto existente (que contenga un project.json).",
+          "rootLabel": "Carpeta del proyecto",
+          "rootPlaceholder": "Elige una carpeta…",
+          "browse": "Explorar…",
+          "import": "Importar"
         }
       },
       "shared": {

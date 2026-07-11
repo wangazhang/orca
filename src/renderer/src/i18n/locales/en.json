@@ -3798,7 +3798,9 @@
           "49f62c5665": "Workspace board",
           "5c9c7c16aa": "Add a project to create workspaces",
           "ca6f729da2": "New workspace ({{value0}})",
-          "a30e34eb5c": "Close workspace board"
+          "a30e34eb5c": "Close workspace board",
+          "sidebarTitleProjects": "Projects",
+          "sidebarTitleWorkspaces": "Workspaces"
         },
         "SidebarNav": {
           "80611a8b10": "Search",
@@ -4573,6 +4575,30 @@
           "save": "Save",
           "notGitFolder": "That folder is not a Git repository.",
           "savedTitle": "Workspace updated"
+        },
+        "AddRepoKindStep": {
+          "title": "Add a project",
+          "description": "Which kind of project do you want to add?",
+          "normalTitle": "Repository project",
+          "normalDescription": "Open, clone, or create a single Git repo or folder",
+          "structuredTitle": "Structured project",
+          "structuredDescription": "Multiple repos with docs and an isolated sandbox"
+        },
+        "AddRepoStructuredStep": {
+          "title": "Structured project",
+          "description": "A project root with docs, an isolated sandbox, and multiple repos.",
+          "newTitle": "New structured project",
+          "newDescription": "Scaffold a fresh project root and its first workspace",
+          "importTitle": "Import structured project",
+          "importDescription": "Register an existing project folder (with project.json)"
+        },
+        "StructuredImportDialog": {
+          "title": "Import structured project",
+          "description": "Choose an existing project folder (one that contains a project.json).",
+          "rootLabel": "Project folder",
+          "rootPlaceholder": "Choose a folder…",
+          "browse": "Browse…",
+          "import": "Import"
         }
       },
       "shared": {

@@ -3764,7 +3764,9 @@
           "5c9c7c16aa": "プロジェクトを追加してワークスペースを作成する",
           "ca6f729da2": "新規ワークスペース ({{value0}})",
           "a30e34eb5c": "ワークスペースボードを閉じる",
-          "25a95899c9": "プロジェクトを追加"
+          "25a95899c9": "プロジェクトを追加",
+          "sidebarTitleProjects": "プロジェクト",
+          "sidebarTitleWorkspaces": "ワークスペース"
         },
         "SidebarNav": {
           "80611a8b10": "検索",
@@ -4573,6 +4575,30 @@
           "save": "Save",
           "notGitFolder": "That folder is not a Git repository.",
           "savedTitle": "Workspace updated"
+        },
+        "AddRepoKindStep": {
+          "title": "プロジェクトを追加",
+          "description": "どの種類のプロジェクトを追加しますか？",
+          "normalTitle": "リポジトリプロジェクト",
+          "normalDescription": "単一の Git リポジトリまたはフォルダを開く・クローン・作成",
+          "structuredTitle": "構造化プロジェクト",
+          "structuredDescription": "ドキュメントと隔離サンドボックスを備えた複数リポジトリ"
+        },
+        "AddRepoStructuredStep": {
+          "title": "構造化プロジェクト",
+          "description": "ドキュメント、隔離サンドボックス、複数リポジトリを含むプロジェクトルート。",
+          "newTitle": "構造化プロジェクトを新規作成",
+          "newDescription": "新しいプロジェクトルートと最初のワークスペースを作成",
+          "importTitle": "構造化プロジェクトをインポート",
+          "importDescription": "既存のプロジェクトフォルダを登録（project.json を含む）"
+        },
+        "StructuredImportDialog": {
+          "title": "構造化プロジェクトをインポート",
+          "description": "既存のプロジェクトフォルダを選択（project.json を含むもの）。",
+          "rootLabel": "プロジェクトフォルダ",
+          "rootPlaceholder": "フォルダを選択…",
+          "browse": "参照…",
+          "import": "インポート"
         }
       },
       "shared": {
