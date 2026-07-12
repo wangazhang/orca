@@ -4232,7 +4232,10 @@
         "useAddRepoLocalFolderFlow": {
           "7ab10e4974": "サーバー パスを使用して、リモート ランタイムからプロジェクトを追加します。",
           "skippedBatchFolders": "一部のフォルダーはスキップされました",
-          "skippedBatchFoldersDescription": "スキップされたフォルダーは個別に追加して確認または確定してください。"
+          "skippedBatchFoldersDescription": "スキップされたフォルダーは個別に追加して確認または確定してください。",
+          "repoAlreadyAdded": "このリポジトリは既に Orca に追加されています",
+          "repoExistsInProject": "構造化プロジェクト「{{value0}}」内",
+          "locateRepo": "表示"
         },
         "useAddRepoNestedImportFlow": {
           "680cac2c82": "{{value0}} は失敗しました",

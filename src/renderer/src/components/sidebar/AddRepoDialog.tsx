@@ -4,6 +4,7 @@ import { useRemoteRepo } from './AddRepoSteps'
 import { useCreateRepo } from './useCreateRepo'
 import { AddRepoDialogStepContent } from './AddRepoDialogStepContent'
 import { handoffToStructuredModal } from './add-repo-structured-handoff'
+import { useResolveExistingRepoLocation } from './add-repo-existing-location'
 import { useAddRepoDialogNav } from './useAddRepoDialogNav'
 import type { AddRepoDialogStep } from './add-repo-dialog-types'
 import { useAddRepoNestedReviewState } from './useAddRepoNestedReviewState'
@@ -162,6 +163,12 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
     typeof modalData.droppedLocalPath === 'string' ? modalData.droppedLocalPath : ''
   const isRuntimeEnvironmentActive = Boolean(selectedRuntimeEnvironmentId)
   const selectedHostKind = hostSelection.selectedParsedHost?.kind
+  const resolveExistingLocation = useResolveExistingRepoLocation()
+  const revealWorktreeInSidebar = useAppStore((s) => s.revealWorktreeInSidebar)
+  const revealExistingWorktree = useCallback(
+    (worktreeId: string) => revealWorktreeInSidebar(worktreeId, { highlight: true }),
+    [revealWorktreeInSidebar]
+  )
   const { handleBrowse, resetLocalFolderFlow } = useAddRepoLocalFolderFlow({
     isOpen,
     droppedLocalPath,
@@ -175,7 +182,9 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
     showNestedRepoReview,
     onGitRepoReady: completeGitRepoAdd,
     setIsAdding,
-    setAddProjectBusyLabel
+    setAddProjectBusyLabel,
+    resolveExistingLocation,
+    revealWorktreeInSidebar: revealExistingWorktree
   })
   const {
     serverPath,

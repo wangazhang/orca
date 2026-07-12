@@ -4232,7 +4232,10 @@
         "useAddRepoLocalFolderFlow": {
           "7ab10e4974": "使用服务器路径从远程运行时添加项目。",
           "skippedBatchFolders": "已跳过部分文件夹",
-          "skippedBatchFoldersDescription": "请单独添加已跳过的文件夹，以便逐个查看或确认。"
+          "skippedBatchFoldersDescription": "请单独添加已跳过的文件夹，以便逐个查看或确认。",
+          "repoAlreadyAdded": "该仓库已在 Orca 中",
+          "repoExistsInProject": "位于结构化工程「{{value0}}」中",
+          "locateRepo": "定位"
         },
         "useAddRepoNestedImportFlow": {
           "680cac2c82": "{{value0}} 失败",

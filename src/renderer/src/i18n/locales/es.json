@@ -4251,7 +4251,10 @@
         "useAddRepoLocalFolderFlow": {
           "7ab10e4974": "Usa una ruta del host para agregar proyectos desde un host remoto.",
           "skippedBatchFolders": "Se omitieron algunas carpetas",
-          "skippedBatchFoldersDescription": "Agrega las carpetas omitidas de forma individual para revisarlas o confirmarlas."
+          "skippedBatchFoldersDescription": "Agrega las carpetas omitidas de forma individual para revisarlas o confirmarlas.",
+          "repoAlreadyAdded": "Este repositorio ya está en Orca",
+          "repoExistsInProject": "En el proyecto estructurado \"{{value0}}\"",
+          "locateRepo": "Localizar"
         },
         "useAddRepoNestedImportFlow": {
           "680cac2c82": "{{value0}} falló",
