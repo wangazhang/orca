@@ -1218,13 +1218,25 @@ describe('createUISlice hydratePersistedUI', () => {
       'resource-usage',
       'ports',
       'kimi',
-      'minimax'
+      'minimax',
+      'antigravity',
+      'grok'
     ])
     expect(setUI).toHaveBeenCalledWith({
-      statusBarItems: ['claude', 'resource-usage', 'ports', 'kimi', 'minimax'],
+      statusBarItems: [
+        'claude',
+        'resource-usage',
+        'ports',
+        'kimi',
+        'minimax',
+        'antigravity',
+        'grok'
+      ],
       _portsStatusBarDefaultAdded: true,
       _kimiStatusBarDefaultAdded: true,
-      _minimaxStatusBarDefaultAdded: true
+      _minimaxStatusBarDefaultAdded: true,
+      _antigravityStatusBarDefaultAdded: true,
+      _grokStatusBarDefaultAdded: true
     })
   })
 
@@ -1238,12 +1250,64 @@ describe('createUISlice hydratePersistedUI', () => {
         statusBarItems: ['claude', 'resource-usage'],
         _portsStatusBarDefaultAdded: true,
         _kimiStatusBarDefaultAdded: true,
-        _minimaxStatusBarDefaultAdded: true
+        _minimaxStatusBarDefaultAdded: true,
+        _antigravityStatusBarDefaultAdded: true,
+        _grokStatusBarDefaultAdded: true
       })
     )
 
     expect(store.getState().statusBarItems).toEqual(['claude', 'resource-usage'])
     expect(setUI).not.toHaveBeenCalled()
+  })
+
+  it('persists and hydrates the usage percentage display preference', () => {
+    const setUI = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('window', { api: { ui: { set: setUI } } })
+    const store = createUIStore()
+
+    store.getState().setUsagePercentageDisplay('used')
+
+    expect(store.getState().usagePercentageDisplay).toBe('used')
+    // Why: adapting the control also permanently dismisses the one-time change notice.
+    expect(setUI).toHaveBeenCalledWith({
+      usagePercentageDisplay: 'used',
+      usagePercentageDisplayChangeNoticeDismissed: true
+    })
+    expect(store.getState().usagePercentageDisplayChangeNoticeDismissed).toBe(true)
+
+    store.getState().hydratePersistedUI(makePersistedUI({ usagePercentageDisplay: 'remaining' }))
+    expect(store.getState().usagePercentageDisplay).toBe('remaining')
+  })
+
+  it('hydrates and dismisses the usage percentage display change notice', () => {
+    const setUI = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('window', { api: { ui: { set: setUI } } })
+    const store = createUIStore()
+
+    store
+      .getState()
+      .hydratePersistedUI(makePersistedUI({ usagePercentageDisplayChangeNoticeDismissed: false }))
+    expect(store.getState().usagePercentageDisplayChangeNoticeDismissed).toBe(false)
+
+    store.getState().dismissUsagePercentageDisplayChangeNotice()
+    expect(store.getState().usagePercentageDisplayChangeNoticeDismissed).toBe(true)
+    expect(setUI).toHaveBeenCalledWith({ usagePercentageDisplayChangeNoticeDismissed: true })
+
+    setUI.mockClear()
+    store.getState().dismissUsagePercentageDisplayChangeNotice()
+    expect(setUI).not.toHaveBeenCalled()
+  })
+
+  it('defaults invalid usage percentage display values to used', () => {
+    const store = createUIStore()
+
+    store.getState().hydratePersistedUI(
+      makePersistedUI({
+        usagePercentageDisplay: 'left' as PersistedUIState['usagePercentageDisplay']
+      })
+    )
+
+    expect(store.getState().usagePercentageDisplay).toBe('used')
   })
 
   it('clamps persisted workspace board column width', () => {

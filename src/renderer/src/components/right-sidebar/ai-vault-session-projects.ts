@@ -1,4 +1,4 @@
-import { normalizeExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
+import { normalizeExecutionHostId } from '../../../../shared/execution-host'
 import type { ProjectHostSetupProjection } from '../../../../shared/project-host-setup-projection'
 import type { AiVaultSession } from '../../../../shared/ai-vault-types'
 import type {
@@ -25,14 +25,12 @@ import {
   type AiVaultSessionProjectCandidate
 } from './ai-vault-session-project-candidates'
 
-export type AiVaultSessionProject = {
-  kind: 'repo' | 'structured' | 'folder' | 'unknown'
-  key: string
-  label: string
-  projectId?: string
-  repoId?: string
-  hostKey?: ExecutionHostId
-}
+// Why: the plain project descriptor moved to /shared (so the lifted filter core
+// stays renderer-free). Its `kind` union carries 'structured', which the
+// aggregation logic below produces. Re-export for renderer import parity.
+import type { AiVaultSessionProject } from '../../../../shared/ai-vault-session-filters'
+export type { AiVaultSessionProject } from '../../../../shared/ai-vault-session-filters'
+
 
 export type AiVaultProjectContext = {
   activeProjectKey: string | null
