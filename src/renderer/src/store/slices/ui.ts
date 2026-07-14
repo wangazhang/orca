@@ -778,6 +778,7 @@ export type UISlice = {
     | 'new-workspace-composer'
     | 'confirm-orca-yaml-hooks'
     | 'structured-iteration'
+    | 'structured-import'
     | 'copy-workspace'
     | 'workspace-settings'
   modalData: Record<string, unknown>

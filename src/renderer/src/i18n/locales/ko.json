@@ -3889,7 +3889,9 @@
           "5c9c7c16aa": "워크스페이스를 만들려면 프로젝트를 추가하세요.",
           "ca6f729da2": "새 워크스페이스({{value0}})",
           "a30e34eb5c": "워크스페이스 보드 닫기",
-          "25a95899c9": "프로젝트 추가"
+          "25a95899c9": "프로젝트 추가",
+          "sidebarTitleProjects": "프로젝트",
+          "sidebarTitleWorkspaces": "워크스페이스"
         },
         "SidebarNav": {
           "80611a8b10": "검색",
@@ -4358,7 +4360,10 @@
         "useAddRepoLocalFolderFlow": {
           "7ab10e4974": "원격 호스트에서 프로젝트를 추가하려면 호스트 경로를 사용하세요.",
           "skippedBatchFolders": "일부 폴더를 건너뛰었습니다",
-          "skippedBatchFoldersDescription": "건너뛴 폴더를 검토하거나 확인하려면 개별적으로 추가하세요."
+          "skippedBatchFoldersDescription": "건너뛴 폴더를 검토하거나 확인하려면 개별적으로 추가하세요.",
+          "repoAlreadyAdded": "이 저장소는 이미 Orca에 있습니다",
+          "repoExistsInProject": "구조화 프로젝트 \"{{value0}}\" 내",
+          "locateRepo": "위치 찾기"
         },
         "useAddRepoNestedImportFlow": {
           "680cac2c82": "{{value0}} 실패",
@@ -4720,6 +4725,30 @@
           "cancel": "취소",
           "forget": "Orca에서 제거",
           "reconnectAndDelete": "재연결 후 삭제"
+        },
+        "AddRepoKindStep": {
+          "title": "프로젝트 추가",
+          "description": "어떤 종류의 프로젝트를 추가하시겠어요?",
+          "normalTitle": "저장소 프로젝트",
+          "normalDescription": "단일 Git 저장소나 폴더를 열거나 복제하거나 만들기",
+          "structuredTitle": "구조화 프로젝트",
+          "structuredDescription": "문서와 격리된 샌드박스를 갖춘 여러 저장소"
+        },
+        "AddRepoStructuredStep": {
+          "title": "구조화 프로젝트",
+          "description": "문서, 격리된 샌드박스, 여러 저장소를 포함하는 프로젝트 루트입니다.",
+          "newTitle": "새 구조화 프로젝트",
+          "newDescription": "새 프로젝트 루트와 첫 워크스페이스를 생성",
+          "importTitle": "구조화 프로젝트 가져오기",
+          "importDescription": "기존 프로젝트 폴더를 등록（project.json 포함）"
+        },
+        "StructuredImportDialog": {
+          "title": "구조화 프로젝트 가져오기",
+          "description": "기존 프로젝트 폴더를 선택하세요（project.json 포함）.",
+          "rootLabel": "프로젝트 폴더",
+          "rootPlaceholder": "폴더 선택…",
+          "browse": "찾아보기…",
+          "import": "가져오기"
         }
       },
       "shared": {

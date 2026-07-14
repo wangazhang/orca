@@ -3908,7 +3908,9 @@
           "5c9c7c16aa": "Agregar un proyecto para crear espacios de trabajo",
           "ca6f729da2": "Nuevo espacio de trabajo ({{value0}})",
           "a30e34eb5c": "Cerrar tablero del espacio de trabajo",
-          "25a95899c9": "Agregar proyecto"
+          "25a95899c9": "Agregar proyecto",
+          "sidebarTitleProjects": "Proyectos",
+          "sidebarTitleWorkspaces": "Espacios de trabajo"
         },
         "SidebarNav": {
           "80611a8b10": "Buscar",
@@ -4377,7 +4379,10 @@
         "useAddRepoLocalFolderFlow": {
           "7ab10e4974": "Usa una ruta del host para agregar proyectos desde un host remoto.",
           "skippedBatchFolders": "Se omitieron algunas carpetas",
-          "skippedBatchFoldersDescription": "Agrega las carpetas omitidas de forma individual para revisarlas o confirmarlas."
+          "skippedBatchFoldersDescription": "Agrega las carpetas omitidas de forma individual para revisarlas o confirmarlas.",
+          "repoAlreadyAdded": "Este repositorio ya está en Orca",
+          "repoExistsInProject": "En el proyecto estructurado \"{{value0}}\"",
+          "locateRepo": "Localizar"
         },
         "useAddRepoNestedImportFlow": {
           "680cac2c82": "{{value0}} falló",
@@ -4720,6 +4725,30 @@
           "cancel": "Cancelar",
           "forget": "Eliminar de Orca",
           "reconnectAndDelete": "Reconectar y eliminar"
+        },
+        "AddRepoKindStep": {
+          "title": "Agregar un proyecto",
+          "description": "¿Qué tipo de proyecto quieres agregar?",
+          "normalTitle": "Proyecto de repositorio",
+          "normalDescription": "Abre, clona o crea un único repositorio de Git o carpeta",
+          "structuredTitle": "Proyecto estructurado",
+          "structuredDescription": "Múltiples repositorios con documentación y un entorno aislado"
+        },
+        "AddRepoStructuredStep": {
+          "title": "Proyecto estructurado",
+          "description": "Una raíz de proyecto con documentación, un entorno aislado y múltiples repositorios.",
+          "newTitle": "Nuevo proyecto estructurado",
+          "newDescription": "Crea una nueva raíz de proyecto y su primer espacio de trabajo",
+          "importTitle": "Importar proyecto estructurado",
+          "importDescription": "Registra una carpeta de proyecto existente (con project.json)"
+        },
+        "StructuredImportDialog": {
+          "title": "Importar proyecto estructurado",
+          "description": "Elige una carpeta de proyecto existente (que contenga un project.json).",
+          "rootLabel": "Carpeta del proyecto",
+          "rootPlaceholder": "Elige una carpeta…",
+          "browse": "Explorar…",
+          "import": "Importar"
         }
       },
       "shared": {

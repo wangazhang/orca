@@ -332,6 +332,7 @@ const ProjectAddedDialog = lazy(() => import('./components/sidebar/ProjectAddedD
 const NewStructuredIterationDialog = lazy(
   () => import('./components/sidebar/NewStructuredIterationDialog')
 )
+const StructuredImportDialog = lazy(() => import('./components/sidebar/StructuredImportDialog'))
 const CopyWorkspaceDialog = lazy(() => import('./components/sidebar/CopyWorkspaceDialog'))
 const WorkspaceSettingsDialog = lazy(() => import('./components/sidebar/WorkspaceSettingsDialog'))
 const DeleteWorktreeDialog = lazy(() => import('./components/sidebar/DeleteWorktreeDialog'))
@@ -2612,6 +2613,16 @@ function App(): React.JSX.Element {
                   compact
                 >
                   <NewStructuredIterationDialog />
+                </RecoverableRenderErrorBoundary>
+              ) : null}
+              {activeModal === 'structured-import' ? (
+                <RecoverableRenderErrorBoundary
+                  boundaryId="modal.structured-import"
+                  surface="modal"
+                  resetKey
+                  compact
+                >
+                  <StructuredImportDialog />
                 </RecoverableRenderErrorBoundary>
               ) : null}
               {activeModal === 'copy-workspace' ? (

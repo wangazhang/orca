@@ -184,4 +184,42 @@ describe('useAddRepoLocalFolderFlow', () => {
     expect(addRepoPath).toHaveBeenCalledWith('/projects/git')
     expect(onGitRepoReady).toHaveBeenCalledWith('git', 'local_folder_picker')
   })
+
+  it('surfaces a toast, locates, and does not add when the path already exists', async () => {
+    pickFolders.mockResolvedValue(['/projects/qa-pk'])
+    const { toast } = await import('sonner')
+    const revealWorktreeInSidebar = vi.fn()
+    const { useAddRepoLocalFolderFlow } = await import('./useAddRepoLocalFolderFlow')
+
+    const { handleBrowse } = useAddRepoLocalFolderFlow({
+      isOpen: true,
+      droppedLocalPath: '',
+      activeRuntimeEnvironmentId: null,
+      addRepoPath,
+      closeModal,
+      fetchWorktrees,
+      scanNestedRepos,
+      setActiveNestedScanId,
+      setNestedScanInProgress,
+      showNestedRepoReview,
+      onGitRepoReady,
+      setIsAdding,
+      setAddProjectBusyLabel,
+      resolveExistingLocation: (path: string) =>
+        path === '/projects/qa-pk'
+          ? { repoName: 'qa-pk', worktreeId: 'folder:fw1', projectName: 'Penguin-go' }
+          : undefined,
+      revealWorktreeInSidebar
+    })
+
+    await handleBrowse()
+
+    expect(toast.info).toHaveBeenCalledTimes(1)
+    expect(addRepoPath).not.toHaveBeenCalled()
+    expect(scanNestedRepos).not.toHaveBeenCalled()
+    expect(onGitRepoReady).not.toHaveBeenCalled()
+    // Single-folder pick jumps straight to the existing row.
+    expect(revealWorktreeInSidebar).toHaveBeenCalledWith('folder:fw1')
+    expect(closeModal).toHaveBeenCalled()
+  })
 })

@@ -3,6 +3,9 @@ import { useAppStore } from '@/store'
 import { useRemoteRepo } from './AddRepoSteps'
 import { useCreateRepo } from './useCreateRepo'
 import { AddRepoDialogStepContent } from './AddRepoDialogStepContent'
+import { handoffToStructuredModal } from './add-repo-structured-handoff'
+import { useResolveExistingRepoLocation } from './add-repo-existing-location'
+import { useAddRepoDialogNav } from './useAddRepoDialogNav'
 import type { AddRepoDialogStep } from './add-repo-dialog-types'
 import { useAddRepoNestedReviewState } from './useAddRepoNestedReviewState'
 import { useAddRepoCloneFlow } from './useAddRepoCloneFlow'
@@ -21,7 +24,6 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
   const activeModal = useAppStore((s) => s.activeModal)
   const modalData = useAppStore((s) => s.modalData)
   const closeModal = useAppStore((s) => s.closeModal)
-  const openModal = useAppStore((s) => s.openModal)
   const addRepoPath = useAppStore((s) => s.addRepoPath)
   const scanNestedRepos = useAppStore((s) => s.scanNestedRepos)
   const cancelNestedRepoScan = useAppStore((s) => s.cancelNestedRepoScan)
@@ -37,7 +39,7 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
     setHideDefaultBranchWorkspace
   })
 
-  const [step, setStep] = useState<AddRepoDialogStep>('add')
+  const [step, setStep] = useState<AddRepoDialogStep>('kind')
   const [isAdding, setIsAdding] = useState(false)
   const [addProjectBusyLabel, setAddProjectBusyLabel] = useState<string | null>(null)
   const {
@@ -161,6 +163,12 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
     typeof modalData.droppedLocalPath === 'string' ? modalData.droppedLocalPath : ''
   const isRuntimeEnvironmentActive = Boolean(selectedRuntimeEnvironmentId)
   const selectedHostKind = hostSelection.selectedParsedHost?.kind
+  const resolveExistingLocation = useResolveExistingRepoLocation()
+  const revealWorktreeInSidebar = useAppStore((s) => s.revealWorktreeInSidebar)
+  const revealExistingWorktree = useCallback(
+    (worktreeId: string) => revealWorktreeInSidebar(worktreeId, { highlight: true }),
+    [revealWorktreeInSidebar]
+  )
   const { handleBrowse, resetLocalFolderFlow } = useAddRepoLocalFolderFlow({
     isOpen,
     droppedLocalPath,
@@ -174,7 +182,9 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
     showNestedRepoReview,
     onGitRepoReady: completeGitRepoAdd,
     setIsAdding,
-    setAddProjectBusyLabel
+    setAddProjectBusyLabel,
+    resolveExistingLocation,
+    revealWorktreeInSidebar: revealExistingWorktree
   })
   const {
     serverPath,
@@ -264,25 +274,14 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
     onResetHostScopedState: resetHostScopedState
   })
 
-  const handleBack = useCallback(() => {
-    if (step === 'nested') {
-      trackNestedBackAction()
-    }
-    resetState()
-  }, [resetState, step, trackNestedBackAction])
-
-  const handleOpenChange = useCallback(
-    (open: boolean) => {
-      if (!open) {
-        if (step === 'nested' && !isAdding) {
-          trackNestedBackAction()
-        }
-        closeModal()
-        resetState()
-      }
-    },
-    [closeModal, isAdding, resetState, step, trackNestedBackAction]
-  )
+  const { handleBack, handleOpenChange } = useAddRepoDialogNav({
+    step,
+    isAdding,
+    setStep,
+    resetState,
+    closeModal,
+    trackNestedBackAction
+  })
 
   return (
     <AddRepoDialogChrome
@@ -353,12 +352,10 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
           setCreateError(null)
           setStep('create')
         }}
-        onOpenStructuredIteration={() => {
-          // Hand off from the derived-projection add flow to the structured
-          // iteration wizard; closing first keeps only one modal open.
-          closeModal()
-          openModal('structured-iteration')
-        }}
+        onOpenStructuredIteration={() => handoffToStructuredModal('new')}
+        onOpenStructuredImport={() => handoffToStructuredModal('import')}
+        onSelectKindNormal={() => setStep('add')}
+        onSelectKindStructured={() => setStep('structured')}
         onOpenRemoteStep={handleOpenRemoteStep}
         onStopNestedScan={handleStopNestedScan}
         onServerPathChange={setServerPath}

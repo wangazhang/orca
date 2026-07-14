@@ -101,6 +101,28 @@ describe('shouldAdjustWorktreeSidebarMeasuredRowScroll', () => {
     ).toBe('keep-pending')
   })
 
+  it('keeps pending while under the retry cap', () => {
+    expect(
+      resolvePendingSidebarReveal({
+        targetIndex: -1,
+        targetWorktreeStillExists: true,
+        keepPendingAttempts: 7,
+        maxKeepPendingAttempts: 8
+      })
+    ).toBe('keep-pending')
+  })
+
+  it('clears a stuck pending reveal once the retry cap is reached (never resolves to a row)', () => {
+    expect(
+      resolvePendingSidebarReveal({
+        targetIndex: -1,
+        targetWorktreeStillExists: true,
+        keepPendingAttempts: 8,
+        maxKeepPendingAttempts: 8
+      })
+    ).toBe('clear')
+  })
+
   it('clears pending reveal requests once the target disappears', () => {
     expect(
       resolvePendingSidebarReveal({

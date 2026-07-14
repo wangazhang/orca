@@ -10,6 +10,11 @@ import {
 import type { AddRepoExistingWorkspaceSource } from '../../../../shared/telemetry-events'
 import type { NestedRepoScanResult, Repo } from '../../../../shared/types'
 import { createNestedRepoScanId } from './add-repo-dialog-types'
+import {
+  notifyRepoAlreadyExists,
+  notifySkippedBatchFolders,
+  type ExistingRepoLocation
+} from './add-repo-existing-location'
 import { translate } from '@/i18n/i18n'
 
 type ShowNestedRepoReview = (args: {
@@ -24,6 +29,7 @@ type ShowNestedRepoReview = (args: {
 
 type LocalPathAddResult =
   | { status: 'completed'; repo: Repo }
+  | { status: 'exists' }
   | { status: 'cancelled' | 'paused' | 'skipped' }
 
 type LocalPathAddMode = 'single' | 'batch'
@@ -41,7 +47,9 @@ export function useAddRepoLocalFolderFlow({
   showNestedRepoReview,
   onGitRepoReady,
   setIsAdding,
-  setAddProjectBusyLabel
+  setAddProjectBusyLabel,
+  resolveExistingLocation,
+  revealWorktreeInSidebar
 }: {
   isOpen: boolean
   droppedLocalPath: string
@@ -60,6 +68,12 @@ export function useAddRepoLocalFolderFlow({
   onGitRepoReady: (repoId: string, source: AddRepoExistingWorkspaceSource) => Promise<void>
   setIsAdding: (isAdding: boolean) => void
   setAddProjectBusyLabel: (label: string | null) => void
+  // Resolves whether a picked path is already loaded in Orca (a worktree/branch
+  // or a registered repo). Adding a duplicate path is a silent no-op at the store
+  // layer, so this lets the flow surface it and offer to locate it instead.
+  resolveExistingLocation?: (path: string) => ExistingRepoLocation | undefined
+  // Scrolls to + highlights an existing worktree row (used by the locate action).
+  revealWorktreeInSidebar?: (worktreeId: string) => void
 }): {
   handleBrowse: () => Promise<void>
   resetLocalFolderFlow: () => void
@@ -93,6 +107,18 @@ export function useAddRepoLocalFolderFlow({
         )
         closeModal()
         return { status: 'paused' }
+      }
+      // Guard duplicates before the scan: a path already loaded in Orca (a
+      // structured workspace branch, or an already-registered repo) would add as
+      // a silent no-op. Surface where it lives and offer to jump to it.
+      const existing = resolveExistingLocation?.(path)
+      if (existing) {
+        notifyRepoAlreadyExists(existing, {
+          isSinglePick: mode === 'single',
+          revealWorktreeInSidebar,
+          closeModal
+        })
+        return { status: 'exists' }
       }
       setAddProjectBusyLabel('Scanning for repositories...')
       try {
@@ -190,6 +216,8 @@ export function useAddRepoLocalFolderFlow({
       closeModal,
       fetchWorktrees,
       onGitRepoReady,
+      resolveExistingLocation,
+      revealWorktreeInSidebar,
       scanNestedRepos,
       setActiveNestedScanId,
       setAddProjectBusyLabel,
@@ -235,6 +263,11 @@ export function useAddRepoLocalFolderFlow({
           skippedCount++
           continue
         }
+        // Already-in-Orca paths were surfaced with a toast; keep importing the
+        // rest instead of aborting the whole batch.
+        if (result.status === 'exists') {
+          continue
+        }
         if (result.status !== 'completed') {
           return
         }
@@ -246,18 +279,7 @@ export function useAddRepoLocalFolderFlow({
         return
       }
       if (skippedCount > 0) {
-        toast.info(
-          translate(
-            'auto.components.sidebar.useAddRepoLocalFolderFlow.skippedBatchFolders',
-            'Some folders were skipped'
-          ),
-          {
-            description: translate(
-              'auto.components.sidebar.useAddRepoLocalFolderFlow.skippedBatchFoldersDescription',
-              'Add skipped folders individually to review or confirm them.'
-            )
-          }
-        )
+        notifySkippedBatchFolders()
       }
       if (shouldDeferGitRepoReady && gitRepoIds.length > 0) {
         await onGitRepoReady(gitRepoIds[0], source)

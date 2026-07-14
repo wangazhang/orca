@@ -360,11 +360,26 @@ export function shouldAdjustWorktreeSidebarMeasuredRowScroll(args: {
 export function resolvePendingSidebarReveal(args: {
   targetIndex: number
   targetWorktreeStillExists: boolean
+  // How many frames we have already waited for the row to render. Guards the
+  // keep-pending path: if the target still has no visible row after the ancestors
+  // were expanded and we have retried this many times, give up and clear so a
+  // stuck pending reveal can never re-expand groups the user is trying to
+  // collapse. Omitted → treated as 0 (first attempt).
+  keepPendingAttempts?: number
+  maxKeepPendingAttempts?: number
 }): 'scroll-and-clear' | 'clear' | 'keep-pending' {
   if (args.targetIndex !== -1) {
     return 'scroll-and-clear'
   }
-  return args.targetWorktreeStillExists ? 'keep-pending' : 'clear'
+  if (!args.targetWorktreeStillExists) {
+    return 'clear'
+  }
+  const attempts = args.keepPendingAttempts ?? 0
+  const max = args.maxKeepPendingAttempts ?? 8
+  // The row exists in data but never resolved to a visible row (e.g. it lives in
+  // a scope with no sidebar row of its own). Stop retrying so it stops fighting
+  // the user's collapse.
+  return attempts >= max ? 'clear' : 'keep-pending'
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -2201,9 +2216,14 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
       const targetIndex = renderRows.findIndex((row) =>
         renderRowContainsWorktree(row, pendingRevealWorktree.worktreeId)
       )
+      const keepPendingAttempts =
+        pendingRevealRetryRef.current?.worktreeId === pendingRevealWorktree.worktreeId
+          ? pendingRevealRetryRef.current.count
+          : 0
       const outcome = resolvePendingSidebarReveal({
         targetIndex,
-        targetWorktreeStillExists
+        targetWorktreeStillExists,
+        keepPendingAttempts
       })
       if (outcome === 'scroll-and-clear') {
         const targetRow = renderRows[targetIndex]
@@ -2281,7 +2301,23 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
       if (outcome === 'clear') {
         pendingRevealRetryRef.current = null
         clearPendingRevealWorktreeId()
+        return
       }
+      // keep-pending: the row is not visible yet. Count this attempt and retry on
+      // the next frame so the attempt cap in resolvePendingSidebarReveal can
+      // eventually fire 'clear' — otherwise a target that never resolves to a
+      // visible row keeps re-expanding ancestors and blocks the user's collapse.
+      const previousKeep = pendingRevealRetryRef.current
+      pendingRevealRetryRef.current = {
+        worktreeId: pendingRevealWorktree.worktreeId,
+        count:
+          previousKeep?.worktreeId === pendingRevealWorktree.worktreeId ? previousKeep.count + 1 : 1
+      }
+      schedulePendingRevealFrame(() => {
+        if (!cancelled) {
+          setPendingRevealRetryTick((tick) => tick + 1)
+        }
+      })
     })
     return () => {
       cancelled = true

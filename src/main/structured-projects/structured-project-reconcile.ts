@@ -6,8 +6,8 @@
 // shells in the sidebar. Reconcile runs at startup (alongside materialize) and
 // after an explicit `iteration delete`, keying every decision on disk truth.
 import { areRuntimePathsEqual } from '../../shared/worktree-ownership'
-import { scanStructuredProjects, scanWorkspaces } from './structured-project-disk'
-import { getProjectsDir } from './structured-project-service'
+import { scanWorkspaces } from './structured-project-disk'
+import { scanAllStructuredProjects } from './structured-project-scan'
 import type { ProjectGroup, Repo } from '../../shared/types'
 
 // Minimal slice of OrcaRuntimeService the reconciler needs — the delete-side
@@ -37,7 +37,7 @@ function scanLiveDiskState(): LiveDiskState {
   const roots: string[] = []
   const workspaceDirs: string[] = []
   const sources: string[] = []
-  for (const project of scanStructuredProjects(getProjectsDir())) {
+  for (const project of scanAllStructuredProjects()) {
     roots.push(project.rootPath)
     for (const member of project.project.members) {
       sources.push(member.source)

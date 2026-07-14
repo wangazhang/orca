@@ -33,6 +33,11 @@ export const IterationGet = z.object({
   project: requiredString('Missing project name or id')
 })
 
+export const IterationImport = z.object({
+  // Absolute path to an existing structured project root (holds project.json).
+  rootPath: requiredString('Missing project root path')
+})
+
 export const IterationDelete = z.object({
   project: requiredString('Missing project name or id'),
   // Off by default: deleting leftover `<workspace>` branches touches the user's

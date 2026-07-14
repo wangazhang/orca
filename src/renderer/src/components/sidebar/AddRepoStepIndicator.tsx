@@ -14,6 +14,8 @@ export function AddRepoStepIndicator({
   onBack
 }: AddRepoStepIndicatorProps): React.JSX.Element | null {
   const showBack =
+    step === 'add' ||
+    step === 'structured' ||
     step === 'clone' ||
     step === 'remote' ||
     step === 'server-path' ||

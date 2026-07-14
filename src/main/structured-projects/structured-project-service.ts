@@ -4,7 +4,6 @@
 // registration (Repo record + meta) is deferred — the physical git worktree is
 // created regardless, and disk remains authoritative.
 import { rmSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import {
   addWorktree,
@@ -15,10 +14,12 @@ import {
 } from '../git/worktree'
 import {
   readProjectFile,
-  scanStructuredProjects,
   scanWorkspaces,
-  writeProjectFile
+  writeProjectFile,
+  type ScannedStructuredProject
 } from './structured-project-disk'
+import { getProjectsDir } from './structured-project-paths'
+import { scanAllStructuredProjects } from './structured-project-scan'
 import { workspaceDir } from './structured-project-layout'
 import { createStructuredProject, createStructuredWorkspace } from './structured-project-scaffold'
 import { mountRepoIntoWorkspace } from './structured-workspace-repo-mount'
@@ -39,12 +40,10 @@ export type StructuredProjectSummary = {
   memberCount: number
 }
 
-// Default root for structured projects (~/orca/projects). Inlined to avoid a
-// shared-constants edit; mirrors the workspaceDir convention. Exported so the
-// reconcile pass scans the same directory this service writes to.
-export function getProjectsDir(): string {
-  return join(homedir(), 'orca', 'projects')
-}
+// Re-exported so existing importers (reconcile, etc.) keep resolving it here
+// while the canonical definition lives cycle-free in the paths module alongside
+// the registered-roots path.
+export { getProjectsDir }
 
 // Exported so the workspace-copy / -update / -remove-repo modules resolve a
 // project by name-or-folder the same way (and throw the same `not found`) rather
@@ -53,7 +52,7 @@ export function resolveProject(idOrName: string): {
   rootPath: string
   project: StructuredProjectFile
 } {
-  const found = scanStructuredProjects(getProjectsDir()).find(
+  const found = scanAllStructuredProjects().find(
     (p) => p.project.name === idOrName || basename(p.rootPath) === idOrName
   )
   if (!found) {
@@ -159,7 +158,7 @@ export async function addWorkspaceRepoService(params: {
 }
 
 export function listStructuredProjectsService(): StructuredProjectSummary[] {
-  return scanStructuredProjects(getProjectsDir()).map((p) => ({
+  return scanAllStructuredProjects().map((p) => ({
     name: p.project.name,
     rootPath: p.rootPath,
     services: p.project.services,
@@ -212,16 +211,28 @@ export type StructuredProjectMaterializationView = {
 // Reads everything materialize needs: project members (with source paths) plus
 // each workspace's on-disk directory (wsDir) and its worktrees. wsDir uses the
 // folder name as the workspace identity to stay aligned with folderPath/parentPath.
-export function getStructuredProjectMaterializationView(
-  idOrName: string
+// Split from the by-name lookup so a caller that already scanned (e.g.
+// materializeAll) can build the view directly, without a second full-dir scan.
+export function buildStructuredProjectMaterializationView(
+  scanned: ScannedStructuredProject
 ): StructuredProjectMaterializationView {
-  const { rootPath, project } = resolveProject(idOrName)
-  const workspaces = scanWorkspaces(rootPath).map((ws) => ({
+  const workspaces = scanWorkspaces(scanned.rootPath).map((ws) => ({
     name: ws.name,
     wsDir: ws.wsDir,
     worktrees: ws.workspace.worktrees
   }))
-  return { name: project.name, rootPath, members: project.members, workspaces }
+  return {
+    name: scanned.project.name,
+    rootPath: scanned.rootPath,
+    members: scanned.project.members,
+    workspaces
+  }
+}
+
+export function getStructuredProjectMaterializationView(
+  idOrName: string
+): StructuredProjectMaterializationView {
+  return buildStructuredProjectMaterializationView(resolveProject(idOrName))
 }
 
 // One workspace branch (branch === workspace name) in one member source repo.

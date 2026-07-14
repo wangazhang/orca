@@ -7,7 +7,7 @@ import type { StructuredServiceKind } from '../../../../shared/structured-projec
 import { translate } from '@/i18n/i18n'
 import { useIterationRepos } from './useIterationRepos'
 import type { MountedRepoView, ReposDropHandlers } from './useIterationRepos'
-import { revealStructuredReposFolders } from './structured-repos-folder-reveal'
+import { materializeAndRefreshStructured } from './structured-materialize-refresh'
 
 export type { MountedRepoView, PendingRepo, ReposDropHandlers } from './useIterationRepos'
 
@@ -59,10 +59,6 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
   const modalData = useAppStore((s) => s.modalData)
   const closeModal = useAppStore((s) => s.closeModal)
   const settings = useAppStore((s) => s.settings)
-  const fetchReposForAllHosts = useAppStore((s) => s.fetchReposForAllHosts)
-  const fetchProjectGroupsForAllHosts = useAppStore((s) => s.fetchProjectGroupsForAllHosts)
-  const fetchFolderWorkspacesForAllHosts = useAppStore((s) => s.fetchFolderWorkspacesForAllHosts)
-  const fetchAllWorktrees = useAppStore((s) => s.fetchAllWorktrees)
   const mountedRef = useMountedRef()
 
   const isOpen = activeModal === 'structured-iteration'
@@ -194,18 +190,7 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
         return
       }
       try {
-        const materializeResult = (await callRuntimeRpc(target, 'iteration.materialize', {
-          project
-        })) as { result?: { workspaceGroupIds?: string[] } }
-        // Refresh in the same order App.tsx uses at startup: repos → groups →
-        // folder workspaces → worktrees (worktrees enumerate over repos).
-        await fetchReposForAllHosts()
-        await fetchProjectGroupsForAllHosts()
-        await fetchFolderWorkspacesForAllHosts()
-        await fetchAllWorktrees()
-        // Reveal each workspace's default-collapsed "src" folder so just-mounted
-        // repos show instead of hiding inside it.
-        revealStructuredReposFolders(materializeResult.result?.workspaceGroupIds ?? [])
+        await materializeAndRefreshStructured(target, project)
       } catch (err) {
         if (mountedRef.current) {
           setError(err instanceof Error ? err.message : String(err))
@@ -225,16 +210,7 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
       )
       closeModal()
     },
-    [
-      closeModal,
-      fetchAllWorktrees,
-      fetchFolderWorkspacesForAllHosts,
-      fetchProjectGroupsForAllHosts,
-      fetchReposForAllHosts,
-      mountPendingRepos,
-      mountedRef,
-      target
-    ]
+    [closeModal, mountPendingRepos, mountedRef, target]
   )
 
   const handleCreateProject = useCallback(
