@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 const skillPath = join(projectDir, 'skills', 'orca-cli', 'SKILL.md')
+const orchestrationSkillPath = join(projectDir, 'skills', 'orchestration', 'SKILL.md')
+const emulatorSkillPath = join(projectDir, 'skills', 'orca-emulator', 'SKILL.md')
 
-function readSkill() {
-  return readFileSync(skillPath, 'utf8')
+function readSkill(path = skillPath) {
+  return readFileSync(path, 'utf8')
 }
 
 describe('orca CLI skill guidance', () => {
@@ -38,7 +40,7 @@ describe('orca CLI skill guidance', () => {
       '`task-create` is also forbidden because it records coordinator-owned tracking state'
     )
     expect(skill).toContain(
-      'orca worktree create --name <task-name> --no-parent --agent codex --prompt'
+      'ORCA worktree create --name <task-name> --no-parent --agent codex --prompt'
     )
     expect(skill).toContain('codex --model gpt-5.5 -c model_reasoning_effort="xhigh"')
     expect(skill).toContain('wait only for TUI readiness if needed to avoid losing input')
@@ -65,6 +67,21 @@ describe('orca CLI skill guidance', () => {
     expect(skill).toContain(
       "this checks the caller's inbox and does not remotely deliver input to another terminal"
     )
+  })
+
+  it('requires full worktree ids across bundled agent guidance', () => {
+    const cliSkill = readSkill()
+    const orchestrationSkill = readSkill(orchestrationSkillPath)
+    const emulatorSkill = readSkill(emulatorSkillPath)
+
+    for (const skill of [cliSkill, orchestrationSkill, emulatorSkill]) {
+      expect(skill).toContain('<repo-id>::<path>')
+      expect(skill).toContain('bare repo id')
+    }
+    expect(cliSkill).toContain('id:<repoId>::<worktreePath>')
+    expect(cliSkill).toContain('two-part address')
+    expect(orchestrationSkill).toContain('id:<newFullWorktreeId>')
+    expect(emulatorSkill).not.toContain('id:abc123')
   })
 
   it('keeps browser injection guidance narrow and avoids literal secret examples', () => {

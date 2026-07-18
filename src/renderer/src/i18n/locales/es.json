@@ -73,6 +73,7 @@
     "matchLabel": {
       "comment": "Comentario",
       "issue": "Issue",
+      "mr": "MR",
       "port": "Puerto",
       "pr": "PR"
     }
@@ -458,6 +459,13 @@
               "all": "Aún no hay comentarios."
             }
           }
+        },
+        "bot": {
+          "author": {
+            "overrides": {
+              "6d5d52b53f": "Se alcanzó el límite de autores de bots personalizados"
+            }
+          }
         }
       },
       "resume": {
@@ -691,7 +699,8 @@
         "devSearchKeywordToast": "toast",
         "devSearchKeywordSonner": "sonner",
         "devSearchKeywordError": "error",
-        "devSearchKeywordNotification": "notification"
+        "devSearchKeywordNotification": "notification",
+        "projectHostsSummary": "{{value0}} hosts"
       },
       "useAppMenuPaste": {
         "pasteTooLarge": "El contenido pegado es demasiado grande."
@@ -1387,7 +1396,9 @@
         "1ff5d979df": "Nadie asignado",
         "checkActionRequiredHint": "Esta verificación necesita una acción manual en GitHub (por ejemplo, aprobar la ejecución del workflow) antes de que se desbloquee la fusión.",
         "dd5d9a4f17": "actualizado {{value0}}",
-        "71a3c0f9d2": "Iniciar espacio de trabajo"
+        "71a3c0f9d2": "Iniciar espacio de trabajo",
+        "filesUnavailable": "Couldn't load changed files.",
+        "filesRetry": "Retry"
       },
       "QuickOpen": {
         "1dbd3f59ff": "Mover",
@@ -2368,7 +2379,9 @@
             "failed": "Espacios de trabajo no eliminados: {{value0}}",
             "error": "Error en la limpieza del espacio de trabajo",
             "skippedAncestor": "Se omitió porque no se pudo eliminar un espacio de trabajo anidado.",
-            "timedOut": "La eliminación de {{value0}} está tardando más de lo esperado. Continuará ejecutándose en segundo plano."
+            "timedOut": "La eliminación de {{value0}} está tardando más de lo esperado. Continuará ejecutándose en segundo plano.",
+            "stillRemoving": "Still removing workspaces: {{value0}}",
+            "skippedPendingAncestor": "Skipped because a nested workspace has not finished removing."
           },
           "candidateRow": {
             "gitLabel": "Git",
@@ -2577,7 +2590,7 @@
               "blocked": {
                 "toast": {
                   "97c98f1afe": "Abrir ajustes",
-                  "7cf51f74fd": "Habilita las escrituras al portapapeles TUI en los ajustes de Terminal para copiar desde SSH, tmux, Neovim o fzf.",
+                  "7cf51f74fd": "Habilita las escrituras al portapapeles TUI en los ajustes de Terminal para copiar desde SSH, tmux, Neovim, fzf o Grok.",
                   "89eaa3e80b": "Escritura al portapapeles del terminal bloqueada"
                 }
               }
@@ -2872,6 +2885,9 @@
           },
           "TerminalTabSplitMenuSection": {
             "splitTerminal": "Dividir terminal"
+          },
+          "TerminalTabLeadingIcon": {
+            "7ab2964bea": "Finalización de agente sin leer"
           }
         }
       },
@@ -3211,6 +3227,13 @@
           "usagePercentageLabel": {
             "used": "{{value0}}% usado",
             "remaining": "{{value0}}% restante"
+          },
+          "UsagePercentageDisplayChangeNotice": {
+            "title": "Usage now shows % used",
+            "body": "Prefer remaining? Change it in Settings.",
+            "dismiss": "Dismiss",
+            "openSettings": "Open Settings",
+            "gotIt": "Got it"
           }
         }
       },
@@ -5472,7 +5495,9 @@
           "bf16ef0af2": "Desactivado",
           "3f6892f307": "Activado",
           "b82f86d7d2": "Corrector ortográfico de Rich Markdown",
-          "5195f0b9ef": "Muestra subrayados y sugerencias ortográficas del navegador al editar Rich Markdown."
+          "5195f0b9ef": "Muestra subrayados y sugerencias ortográficas del navegador al editar Rich Markdown.",
+          "7ddd66fede": "Ajuste de línea en el editor",
+          "9b18de6eea": "Ajusta las líneas largas en editores de archivos en lugar de requerir desplazamiento horizontal."
         },
         "AdvancedNetworkSettingsSection": {
           "3e431564b5": "localhost, 127.0.0.1, *.internal",
@@ -6155,7 +6180,7 @@
           "26fef02bf3": "Icono de proyecto",
           "c7ef4415de": "Nombre para mostrar",
           "b0a0c14a1c": "Detalles de visualización específicos del proyecto para la barra lateral y las pestañas.",
-          "170624bdfb": "Eliminar este proyecto de Orca.",
+          "removeProjectAllHosts": "Eliminar este proyecto de Orca en todos los hosts configurados.",
           "0909e5d650": "Eliminar proyecto",
           "ee5a290616": "Abierto como carpeta. Las funciones de Git no están disponibles para este espacio de trabajo.",
           "323debba71": "Tipo:",
@@ -7750,7 +7775,9 @@
             "defaultProjectRuntime": "Runtime de proyecto predeterminado",
             "defaultProjectRuntimeDescription": "Elige el runtime que heredarán los proyectos locales de Windows.",
             "d2d2d929c0": "Corrector ortográfico de Rich Markdown",
-            "4497e2e2bb": "Muestra subrayados y sugerencias ortográficas del navegador al editar Rich Markdown."
+            "4497e2e2bb": "Muestra subrayados y sugerencias ortográficas del navegador al editar Rich Markdown.",
+            "e61157e926": "Ajuste de línea en el editor",
+            "005be5c699": "Ajusta las líneas largas en editores de archivos en lugar de requerir desplazamiento horizontal."
           }
         },
         "git": {
@@ -8732,7 +8759,9 @@
                 "fe9231215b": "Comprobando el acceso a Linear antes de mostrar las acciones de configuración.",
                 "e1f5e6424c": "Conexión completada para {{value0}} workspace{{value1}}",
                 "disconnect_all": "Desconectar todo",
-                "account_scope_prefix": "Alcance de la cuenta"
+                "account_scope_prefix": "Alcance de la cuenta",
+                "2d60ec7921": "Connect a Jira Cloud site with an API token, or a self-hosted Jira with a personal access token or username and password. Credentials are sent to the selected remote runtime and stored there with runtime-supported encryption.",
+                "977e360b71": "Connect a Jira Cloud site with an API token, or a self-hosted Jira with a personal access token or username and password. Credentials are stored locally and encrypted when local runtime storage supports it."
               }
             }
           }
@@ -9090,11 +9119,67 @@
           "3325d996cb": "Actualizar uso",
           "a8f3e2c1b4": "Créditos semanales",
           "b7e2d9f0a3": "El mismo porcentaje de créditos semanales que la pantalla grok /usage en la terminal.",
-          "c6d1a8f4e2": "Se restablece {{when}}"
+          "c6d1a8f4e2": "Se restablece {{when}}",
+          "e6dadc1e2b": "Monthly usage",
+          "75e396bf42": "Included monthly usage for Grok unified-billing accounts."
         },
         "AppearanceWindowSidebarSection": {
           "usagePercentageDisplayUsed": "Usado",
           "usagePercentageDisplayRemaining": "Restante"
+        },
+        "TerminalInteractionSection": {
+          "567633ff50": "Right-click pastes the clipboard into the terminal. Control-click to open the context menu.",
+          "c64497148a": "Right-click pastes the clipboard. Control-click opens the context menu."
+        },
+        "MobileRelayStatusSection": {
+          "registered": "Registered",
+          "connecting": "Connecting",
+          "reconnecting": "Reconnecting",
+          "offline": "Offline",
+          "title": "Orca Relay",
+          "automatic": "Connect from anywhere when a phone is paired",
+          "signInPrompt": "Sign in on this desktop to connect from anywhere",
+          "directStillAvailable": "LAN and Tailscale connections remain available.",
+          "directNeedsNoAccount": "LAN and Tailscale pairing still work without an account.",
+          "signIn": "Sign in",
+          "unavailable": "Unavailable",
+          "standby": "Standby — no relay devices"
+        },
+        "MobilePairingConnectionOptions": {
+          "ready": "Listo",
+          "connecting": "Conectando",
+          "available": "Disponible",
+          "reconnecting": "Reconectando",
+          "unavailable": "No disponible",
+          "title": "¿Cómo debe conectarse el teléfono nuevo?",
+          "anywhere": "Conectar con Orca Relay",
+          "recommended": "Recomendado",
+          "automaticDescription": "Orca usa una conexión directa cuando está disponible y Relay en caso contrario.",
+          "signInDescription": "Inicia sesión en este ordenador para usar Orca Relay.",
+          "signIn": "Iniciar sesión",
+          "localOnly": "Solo red local",
+          "localShort": "LAN o Tailscale",
+          "localDescription": "Usa LAN o Tailscale sin conectar este teléfono mediante Orca Relay."
+        },
+        "MobilePairingSetupSection": {
+          "title": "Vincular un teléfono",
+          "automaticDescription": "El código de vinculación incluye acceso directo y Orca Relay cifrado como respaldo.",
+          "localDescription": "El código de vinculación solo se conecta mediante la dirección de red local indicada abajo.",
+          "regenerate": "Regenerar",
+          "generate": "Generar código QR",
+          "localSettings": "Configuración de conexión local",
+          "localAddressDescription": "Elige la dirección LAN o de red privada que Orca Mobile puede usar para acceder directamente a este ordenador.",
+          "refresh": "Actualizar interfaces de red",
+          "tailnet": "Conectarse con tu propia tailnet",
+          "tailnetDescription": "Instala Tailscale en este ordenador y en tu teléfono, inicia sesión en la misma tailnet y selecciona arriba su dirección 100.x.y.z.",
+          "getTailscale": "Obtener Tailscale"
+        },
+        "MobileRelayBetaAvailability": {
+          "about": "Acerca de la beta de Orca Relay",
+          "beta": "Beta",
+          "availability": "Disponible en",
+          "testFlight": "TestFlight",
+          "androidApk": "APK de Android"
         }
       },
       "right": {
@@ -9729,7 +9814,9 @@
                 "b13f85d75c": "Cronología",
                 "f5cf324efa": "Opciones de visualización de comentarios",
                 "5e6e5a13fa": "Vista",
-                "actionRequiredHint": "Este check requiere una acción manual en GitHub (por ejemplo, aprobar la ejecución del workflow) antes de que el merge quede desbloqueado."
+                "actionRequiredHint": "Este check requiere una acción manual en GitHub (por ejemplo, aprobar la ejecución del workflow) antes de que el merge quede desbloqueado.",
+                "b3195cba33": "Desmarcar autor como bot",
+                "f588b46a6c": "Marcar autor como bot"
               },
               "empty": {
                 "state": {
@@ -9964,7 +10051,9 @@
             "23e98f192f": "Esto elimina permanentemente el archivo en el host remoto. Esto no se puede deshacer.",
             "8b8ee9d22f": "No se pudo determinar qué host posee este archivo. Comprueba la conexión del espacio de trabajo e inténtalo de nuevo.",
             "af1270b90d": "¿Eliminar {{count}} elementos permanentemente?",
-            "dd029aa5cd": "Esto elimina permanentemente los elementos seleccionados y el contenido de cualquier directorio en el host remoto. Esto no se puede deshacer."
+            "dd029aa5cd": "Esto elimina permanentemente los elementos seleccionados y el contenido de cualquier directorio en el host remoto. Esto no se puede deshacer.",
+            "77fdc36183": "Delete {{count}} items?",
+            "fca915a67a": "Remote items are permanently deleted and cannot be undone. Local items move to the {{value0}}."
           },
           "useFileExplorerHandlers": {
             "32cd9fd991": "No se puede abrir el destino del enlace simbólico"
@@ -10702,6 +10791,21 @@
           "trigger-label": "Dirección de red para anunciar",
           "custom-option": "{{address}} (personalizada)",
           "add-custom": "Añadir dirección personalizada…"
+        },
+        "WindowsFirewallNotice": {
+          "repair-success": "Windows Firewall now allows Orca Mobile on private networks",
+          "repair-failed": "Could not update the Windows Firewall rules",
+          "public-title": "Windows marks this network as public",
+          "missing-title": "Allow phone connections through Windows Firewall",
+          "public-description": "Change this trusted Wi-Fi network to Private before allowing Orca Mobile connections.",
+          "missing-description": "Windows may block the pairing server. Add a rule for this Orca app and TCP port {{port}} on Private networks.",
+          "open-settings": "Open network settings",
+          "waiting": "Waiting for Windows…",
+          "allow": "Allow phone connections",
+          "repair-unverified": "Windows Firewall access could not be verified",
+          "blocked-title": "Windows may be blocking Orca Mobile",
+          "blocked-description": "An existing inbound Block rule can override the pairing exception. Repair removes conflicting TCP rules for this Orca app, then allows port {{port}} on Private networks.",
+          "repair": "Repair firewall access"
         }
       },
       "gitlab": {
@@ -11499,7 +11603,9 @@
           "c98ce191da": "Este diff no tiene ningún archivo del lado modificado para abrir",
           "9b80bbe1de": "Abrir pestaña de archivo",
           "f0fd4174b5": "Abre la pestaña de archivo para usar la edición enriquecida de Markdown",
-          "a10d9b8337": "Abrir archivo"
+          "a10d9b8337": "Abrir archivo",
+          "2076ecfc9c": "Cambio anterior",
+          "631dab0df3": "Cambio siguiente"
         },
         "EditorPanelMarkdownActionsMenu": {
           "3e0ce48c24": "Exportar como PDF",
@@ -11836,7 +11942,13 @@
                 "5f9a0ed7c4": "Título 4",
                 "01a71dbbdd": "Encabezado de sección anidada.",
                 "8440fa4acf": "Título 5",
-                "b287b93c66": "Encabezado de sección profunda."
+                "b287b93c66": "Encabezado de sección profunda.",
+                "7a2c1f9b04": "Alternar título 2",
+                "b3e5d8a1c6": "Cree una sección plegable con un resumen de encabezado mediano.",
+                "2f9d6b4e10": "Alternar título 3",
+                "8c1a3e7d52": "Cree una sección plegable con un resumen de encabezado pequeño.",
+                "5e0b9c2a71": "Alternar título 4",
+                "d4f16a8b39": "Cree una sección plegable con un resumen de encabezado anidado."
               }
             }
           }
@@ -12671,7 +12783,24 @@
             "70fcd360c4": "https://example.atlassian.net",
             "e176f9d0c5": "URL del sitio de Jira Cloud",
             "d785c42b8b": "Usa una URL de Jira Cloud, email de Atlassian y token API para explorar issues.",
-            "8388bdea2b": "Conectar sitio de Jira"
+            "8388bdea2b": "Conectar sitio de Jira",
+            "2e2b69e48e": "Use a self-hosted Jira base URL and a personal access token to browse issues.",
+            "b67e919bd5": "Jira instance type",
+            "17787d6e4b": "Atlassian Cloud",
+            "bc7a831773": "Self-hosted",
+            "3489e186d6": "Jira site URL",
+            "cbc27fa599": "https://jira.example.com",
+            "730d973bae": "Personal access token",
+            "8b9c7b9e7b": "Jira personal access token",
+            "ccfb086d3e": "Create a personal access token in your Jira profile under Personal Access Tokens.",
+            "1d947a07ab": "Use a self-hosted Jira base URL, username, and password to browse issues.",
+            "f49708c369": "Jira authentication method",
+            "84a810dd0e": "Username & password",
+            "8d1223fa5c": "Username",
+            "be9eba0a1b": "username",
+            "70035652d7": "Password",
+            "c50abbf340": "Jira account password",
+            "d8737db691": "Use your Jira Server or Data Center account username and password."
           }
         }
       },
@@ -12832,7 +12961,7 @@
         "profiles": {
           "switcher": {
             "cloud": {
-              "unavailable": "Inicio de sesión en la nube no disponible"
+              "unavailable": "Inicio de sesión en Orca no disponible"
             },
             "account": "Cuenta",
             "reconnect": "Reconectar perfil",
@@ -12856,7 +12985,14 @@
             "c106c674fe": "Nuevo perfil local",
             "org": {
               "members": "Miembros de la organización"
-            }
+            },
+            "signInWaiting": "Esperando el inicio de sesión…",
+            "signInAgain": "Volver a iniciar sesión",
+            "signIn": "Iniciar sesión en Orca",
+            "accountTitle": "Cuenta de Orca",
+            "accountSignedIn": "Sesión iniciada",
+            "accountSignInRequired": "Inicio de sesión requerido",
+            "accountSignedOut": "Sesión cerrada"
           },
           "management": {
             "04e7bd2a23": "Transferir",
@@ -12899,8 +13035,8 @@
           },
           "signout": {
             "confirm": {
-              "title": "¿Cerrar sesión?",
-              "description": "Cerrar sesión de {{profileName}} y mantener sus proyectos, worktrees y metadatos locales en este dispositivo.",
+              "title": "¿Cerrar sesión en Orca?",
+              "description": "Se cerrará tu sesión de Orca en este dispositivo. Tus proyectos y worktrees locales no se verán afectados.",
               "cancel": "Cancelar",
               "action": "Cerrar sesión"
             }
@@ -13002,6 +13138,37 @@
         "searchLabels": "Filtrar etiquetas…",
         "searchAssignee": "Filtrar asignatario…",
         "back": "Atrás"
+      },
+      "browser-pane": {
+        "markup": {
+          "cancel": "Cancelar",
+          "clear": "Borrar todo",
+          "copiedToast": "Marcado copiado: pégalo en tu agente ({{value0}})",
+          "copy": "Copiar marcado",
+          "drawButton": "Dibujar en la captura",
+          "drawHint": "Dibuja en la página y copia el markup para pegarlo en tu agente.",
+          "drawHintBadge": "Nuevo",
+          "drawHintDismiss": "Entendido",
+          "drawHintTry": "Probar",
+          "errorAttach": "No se pudo adjuntar la captura de pantalla con marcado.",
+          "errorCapture": "No se pudo capturar la página para dibujar.",
+          "errorUnavailable": "El marcado de captura de pantalla no está disponible en esta página.",
+          "fontSize": "Tamaño de letra",
+          "hint": "Dibuja en la página y luego copia el marcado para pegarlo en tu agente.",
+          "redo": "Rehacer",
+          "style": "Color y grosor",
+          "textInput": "Texto de anotación",
+          "tool": {
+            "arrow": "Flecha",
+            "ellipse": "Elipse",
+            "highlight": "Resaltador",
+            "pen": "Lápiz",
+            "rect": "Rectángulo",
+            "text": "Texto"
+          },
+          "undo": "Deshacer",
+          "widthOption": "{{value0}} px"
+        }
       }
     },
     "i18n": {
@@ -13083,7 +13250,9 @@
         "otherPlaceholder": "Escribe tu respuesta",
         "cancel": "Cancelar",
         "send": "Enviar respuesta",
-        "next": "Siguiente"
+        "next": "Siguiente",
+        "skip": "Omitir",
+        "sending": "Enviando…"
       },
       "approval": {
         "title": "¿Permitir {{value0}}?",

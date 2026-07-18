@@ -11,7 +11,9 @@ function readSkill() {
 
 function getSection(markdown, heading) {
   const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const match = markdown.match(new RegExp(`## ${escapedHeading}\\n([\\s\\S]*?)(?=\\n## |$)`))
+  const match = markdown.match(
+    new RegExp(`## ${escapedHeading}\\r?\\n([\\s\\S]*?)(?=\\r?\\n## |$)`)
+  )
 
   expect(match).not.toBeNull()
 
@@ -187,6 +189,20 @@ describe('orchestration skill guidance', () => {
     expect(agentGuidance).toContain('fresh preamble + TASK block delivered as new terminal input')
     expect(skill).not.toContain('post-completion polling messages')
     expect(skill).not.toContain('every 2 minutes')
+  })
+
+  it('documents @grok in the Messaging group address list', () => {
+    const skill = readSkill()
+    const messaging = getSection(skill, 'Messaging')
+
+    expect(messaging).toContain('`@grok`')
+  })
+
+  it('documents @cursor in the Messaging group address list', () => {
+    const skill = readSkill()
+    const messaging = getSection(skill, 'Messaging')
+
+    expect(messaging).toContain('`@cursor`')
   })
 
   it('keeps agent-first launch, handle recovery, and inbox injection distinct', () => {

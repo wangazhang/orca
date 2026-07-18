@@ -120,10 +120,7 @@ export class KimiSessionIndexCache {
   }
 }
 
-function identitiesMatch(
-  left: KimiSessionIndexIdentity,
-  right: KimiSessionIndexIdentity
-): boolean {
+function identitiesMatch(left: KimiSessionIndexIdentity, right: KimiSessionIndexIdentity): boolean {
   return (
     left.changeTimeMs === right.changeTimeMs &&
     left.mtimeMs === right.mtimeMs &&

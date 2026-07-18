@@ -57,6 +57,32 @@ export type WorktreeAttention = {
 
 export const IDLE: WorktreeAttention = { cls: 4, attentionTimestamp: 0 }
 
+export function hasFreshAttributedAgentStatus(
+  agentStatusByPaneKey: Record<string, AgentStatusEntry> | undefined,
+  now: number,
+  tabsByWorktree: Record<string, TerminalTab[]>
+): boolean {
+  const freshUnstampedTabIds = new Set<string>()
+  for (const entry of Object.values(agentStatusByPaneKey ?? {})) {
+    const parsed = parsePaneKey(entry.paneKey)
+    if (parsed === null || !isExplicitAgentStatusFresh(entry, now, AGENT_STATUS_STALE_AFTER_MS)) {
+      continue
+    }
+    if (entry.worktreeId) {
+      return true
+    }
+    // Why: hook rows can omit the redundant stamp while paneKey still maps to
+    // a mirrored tab, which is enough to end the Smart cold-start fallback.
+    freshUnstampedTabIds.add(parsed.tabId)
+  }
+  if (freshUnstampedTabIds.size === 0) {
+    return false
+  }
+  return Object.values(tabsByWorktree).some((tabs) =>
+    tabs.some((tab) => freshUnstampedTabIds.has(tab.id))
+  )
+}
+
 /**
  * Walk a pane's state-history rows and return the timestamp of the most
  * recent `done`/`blocked`/`waiting` entry, ignoring `done` rows that were
@@ -152,7 +178,18 @@ export function resolveAttention(panes: PaneInput[], now: number): WorktreeAtten
         // been working for an hour. Falls back to the current stateStartedAt
         // when stateHistory is empty (e.g. fresh after restart).
         const prior = mostRecentAttentionInHistory(entry.stateHistory)
-        ts = prior ?? entry.stateStartedAt
+        if (prior === null) {
+          ts = entry.stateStartedAt
+        } else if (entry.agentType === 'command-code') {
+          // Why: Command Code has no UserPromptSubmit hook, so a new prompt while
+          // still `working` only advances stateStartedAt (no new history row). It
+          // must beat the stale prior-attention timestamp. Other agents keep the
+          // prior-attention ordering — their real state transitions already mark
+          // the turn boundary, so scoping avoids reordering them.
+          ts = Math.max(prior, entry.stateStartedAt)
+        } else {
+          ts = prior
+        }
       }
     } else {
       // Title-heuristic fallback (no fresh hook entry for this pane). Hook
@@ -289,18 +326,25 @@ export function buildAttentionByWorktree(
     agentStatusByPaneKey,
     migrationUnsupportedByPtyId
   )
+  const mirroredTabIds = new Set(
+    Object.values(tabsByWorktree ?? {}).flatMap((tabs) => tabs.map((tab) => tab.id))
+  )
   const result = new Map<string, WorktreeAttention>()
 
   for (const worktree of worktrees) {
     const tabs = tabsByWorktree?.[worktree.id] ?? []
-    const tabIds = new Set(tabs.map((tab) => tab.id))
-    const panes: PaneInput[] = []
-    for (const entry of byAttributedWorktree.get(worktree.id) ?? []) {
-      const parsed = parsePaneKey(entry.paneKey)
-      if (!parsed || tabIds.has(parsed.tabId)) {
-        continue
-      }
-      panes.push({ kind: 'hook', entry })
+    // Why: hook stamps can arrive before the renderer mirrors a headless or
+    // remote tab. Once mirrored anywhere, live tab ownership is authoritative
+    // over a stale worktree stamp and must not promote both worktrees.
+    const panes: PaneInput[] = (byAttributedWorktree.get(worktree.id) ?? [])
+      .filter((entry) => {
+        const parsed = parsePaneKey(entry.paneKey)
+        return parsed !== null && !mirroredTabIds.has(parsed.tabId)
+      })
+      .map((entry) => ({ kind: 'hook' as const, entry }))
+    if (tabs.length === 0) {
+      result.set(worktree.id, resolveAttention(panes, now))
+      continue
     }
     for (const tab of tabs) {
       const hookEntries = byTab.get(tab.id)

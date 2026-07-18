@@ -12,6 +12,7 @@ import type {
   GitHubWorkItem,
   JiraIssue,
   LinearIssue,
+  ManualRepoOrderEntry,
   PersistedTrustedOrcaHooks,
   PersistedUIState,
   StatusBarItem,
@@ -27,8 +28,13 @@ import type {
   WorktreeCardMode,
   WorkspaceHostOrder,
   WorkspaceHostScope,
-  VisibleWorkspaceHostIds
+  VisibleWorkspaceHostIds,
+  TopLevelView
 } from '../../../../shared/types'
+import {
+  applyManualRepoOrder,
+  normalizeManualRepoOrder
+} from '../../../../shared/manual-repo-order'
 import type { UsagePercentageDisplay } from '../../../../shared/usage-percentage-display'
 import {
   DEFAULT_USAGE_PERCENTAGE_DISPLAY,
@@ -497,6 +503,37 @@ function hydratedUIPartialMatchesState(state: AppState, hydrated: Partial<UISlic
   )
 }
 
+// Record keys are exhaustive over TopLevelView, so a new view can't be silently missed.
+const TOP_LEVEL_VIEW_LOOKUP: Record<TopLevelView, true> = {
+  terminal: true,
+  settings: true,
+  tasks: true,
+  activity: true,
+  automations: true,
+  space: true,
+  skills: true,
+  mobile: true
+}
+const KNOWN_TOP_LEVEL_VIEWS = new Set<string>(Object.keys(TOP_LEVEL_VIEW_LOOKUP))
+
+function sanitizeHydratedActiveView(
+  value: PersistedUIState['activeView'],
+  experimentalActivityEnabled: boolean
+): TopLevelView {
+  // Why: older data (pre-activeView) or a view a different build doesn't have
+  // falls back to terminal rather than rendering nothing.
+  if (typeof value !== 'string' || !KNOWN_TOP_LEVEL_VIEWS.has(value)) {
+    return 'terminal'
+  }
+  // Why: activity is hidden when its setting is off, so restoring it lands on a
+  // hidden page (same guard as closeSettingsPage). mobile/automations stay
+  // functional when hidden, so only activity is gated here.
+  if (value === 'activity' && !experimentalActivityEnabled) {
+    return 'terminal'
+  }
+  return value as TopLevelView
+}
+
 let agentSendTargetModeInstanceCounter = 0
 
 function createAgentSendTargetModeInstanceId(): string {
@@ -590,15 +627,7 @@ export type UISlice = {
   acknowledgedAgentsByPaneKey: Record<string, number>
   acknowledgeAgents: (paneKeys: string[]) => void
   unacknowledgeAgents: (paneKeys: string[]) => void
-  activeView:
-    | 'terminal'
-    | 'settings'
-    | 'tasks'
-    | 'activity'
-    | 'automations'
-    | 'space'
-    | 'skills'
-    | 'mobile'
+  activeView: TopLevelView
   previousViewBeforeTasks:
     | 'terminal'
     | 'settings'
@@ -692,6 +721,7 @@ export type UISlice = {
       title: string
       url: string
       linearIdentifier?: string
+      linearBranchName?: string
     } | null
     /** Why: starting from a task must preserve where provider data came from
      *  separately from the host selected to run the workspace. */
@@ -747,6 +777,14 @@ export type UISlice = {
   } | null
   openSettingsTarget: (target: NonNullable<UISlice['settingsNavigationTarget']>) => void
   clearSettingsTarget: () => void
+  /**
+   * Which host the Projects Settings pane shows for each project, keyed by
+   * projectId. Set by the pane's "Available Hosts" switcher. Ephemeral on
+   * purpose — never persisted, so a reload reopens on the project's effective
+   * host rather than a possibly-dangling selection.
+   */
+  settingsProjectHostSelection: Record<string, ExecutionHostId>
+  setSettingsProjectHostSelection: (projectId: string, hostId: ExecutionHostId) => void
   /**
    * One-shot Appearance accordion to expand for nested Settings deep links
    * (e.g. Usage percentages lives under Window & Sidebar). Cleared when
@@ -861,6 +899,7 @@ export type UISlice = {
   setVisibleWorkspaceHostIds: (ids: VisibleWorkspaceHostIds) => void
   workspaceHostOrder: WorkspaceHostOrder
   setWorkspaceHostOrder: (ids: WorkspaceHostOrder) => void
+  manualRepoOrder: ManualRepoOrderEntry[]
   hideDefaultBranchWorkspace: boolean
   setHideDefaultBranchWorkspace: (v: boolean) => void
   hideAutomationGeneratedWorkspaces: boolean
@@ -954,7 +993,7 @@ export type UISlice = {
   setUIZoomLevel: (level: number) => void
   editorFontZoomLevel: number
   setEditorFontZoomLevel: (level: number) => void
-  hydratePersistedUI: (ui: PersistedUIState) => void
+  hydratePersistedUI: (ui: PersistedUIState, source?: 'startup' | 'sync') => void
   updateStatus: UpdateStatus
   setUpdateStatus: (status: UpdateStatus) => void
   // Why: cached changelog from the last 'available' status so the card still has
@@ -1513,6 +1552,20 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   settingsNavigationTarget: null,
   openSettingsTarget: (target) => set({ settingsNavigationTarget: target }),
   clearSettingsTarget: () => set({ settingsNavigationTarget: null }),
+  settingsProjectHostSelection: {},
+  // Why: renderer-only, never persisted — no window.api.ui.set here and this
+  // field is intentionally absent from the debounced UI writer in App.tsx.
+  setSettingsProjectHostSelection: (projectId, hostId) =>
+    set((s) =>
+      s.settingsProjectHostSelection[projectId] === hostId
+        ? s
+        : {
+            settingsProjectHostSelection: {
+              ...s.settingsProjectHostSelection,
+              [projectId]: hostId
+            }
+          }
+    ),
   appearanceAccordionDeepLink: null,
   setAppearanceAccordionDeepLink: (section) => set({ appearanceAccordionDeepLink: section }),
   clearAppearanceAccordionDeepLink: () => set({ appearanceAccordionDeepLink: null }),
@@ -2018,6 +2071,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     set({ workspaceHostOrder })
     window.api.ui.set({ workspaceHostOrder }).catch(console.error)
   },
+  manualRepoOrder: [],
 
   hideDefaultBranchWorkspace: false,
   setHideDefaultBranchWorkspace: (v) => set({ hideDefaultBranchWorkspace: v }),
@@ -2328,8 +2382,10 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   editorFontZoomLevel: 0,
   setEditorFontZoomLevel: (level) => set({ editorFontZoomLevel: level }),
 
-  hydratePersistedUI: (ui) =>
+  hydratePersistedUI: (ui, source = 'sync') =>
     set((s) => {
+      const manualRepoOrder = normalizeManualRepoOrder(ui.manualRepoOrder)
+      const orderedRepos = applyManualRepoOrder(s.repos, manualRepoOrder)
       const validRepoIds = new Set(s.repos.map((repo) => repo.id))
       const persistedFilterRepoIds = sanitizePersistedRepoIds(ui.filterRepoIds)
       // Why: persisted UI from pre-rename builds used sidekick* keys. Read
@@ -2432,6 +2488,10 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         workspaceHostScope: normalizeExecutionHostScope(ui.workspaceHostScope),
         visibleWorkspaceHostIds: normalizeHydratedVisibleWorkspaceHostIds(ui),
         workspaceHostOrder: normalizeExecutionHostOrder(ui.workspaceHostOrder),
+        manualRepoOrder,
+        // Why: UI state can arrive after a catalog or from another client; apply
+        // the desktop-owned overlay immediately instead of waiting for a refetch.
+        repos: orderedRepos,
         hideDefaultBranchWorkspace: ui.hideDefaultBranchWorkspace ?? false,
         hideAutomationGeneratedWorkspaces: ui.hideAutomationGeneratedWorkspaces === true,
         showDotfilesByWorktree: sanitizeShowDotfilesByWorktree(ui.showDotfilesByWorktree),
@@ -2527,6 +2587,14 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         workspaceCleanupDismissals: sanitizeWorkspaceCleanupDismissals(
           ui.workspaceCleanup?.dismissals
         ),
+        // Why: restore the view only from the startup hydration. The same action also
+        // runs on every cross-window ui:stateChanged broadcast (source 'sync', the
+        // default); re-applying activeView there would yank the user's current
+        // per-window view (navigation state, not a synced preference).
+        activeView:
+          source === 'startup'
+            ? sanitizeHydratedActiveView(ui.activeView, s.settings?.experimentalActivity === true)
+            : s.activeView,
         persistedUIReady: true
       }
       // Why: main rebroadcasts UI written by any client. Identical hydration must
