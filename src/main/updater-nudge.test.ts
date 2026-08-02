@@ -8,6 +8,13 @@ vi.mock('electron', () => ({
   net: { fetch: netFetchMock }
 }))
 
+// Why: this fork ships with no changelog/nudge service configured, which makes
+// fetchNudge return early. Supply a base URL so the response-parsing rules below
+// stay covered — they still apply to anyone who points the app at a service.
+vi.mock('../shared/update-feed-origin', () => ({
+  UPDATE_CHANGELOG_BASE_URL: 'https://nudge.test'
+}))
+
 import { fetchNudge, versionMatchesRange, shouldApplyNudge } from './updater-nudge'
 
 describe('updater-nudge', () => {

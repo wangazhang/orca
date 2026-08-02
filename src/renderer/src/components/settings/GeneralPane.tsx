@@ -6,6 +6,7 @@ import { CliSection } from './CliSection'
 import { GeneralEditorSettingsSection } from './GeneralEditorSettingsSection'
 import { GeneralSupportSection } from './GeneralSupportSection'
 import { GeneralUpdateSettingsSection } from './GeneralUpdateSettingsSection'
+import { GeneralLicenseSettingsSection } from './GeneralLicenseSettingsSection'
 import { GeneralWorkspaceSettingsSection } from './GeneralWorkspaceSettingsSection'
 import {
   getGeneralCliSearchEntries,
@@ -191,7 +192,11 @@ export function GeneralPane({
     ) : null,
     matchesSettingsSearch(searchQuery, getGeneralUpdateSearchEntries()) ? (
       <GeneralUpdateSettingsSection key="updates" />
-    ) : null
+    ) : null,
+    // Why unconditional rather than search-gated: the section removes itself
+    // when the build does not enforce licensing, so there is nothing to match
+    // against in that case and no keyword list to keep in sync.
+    <GeneralLicenseSettingsSection key="license" />
     // Note: the Support section is rendered outside this array so it can own
     // its own loading placeholder and its own collapsing Separator. Without
     // that separation, a dangling divider would remain above the collapsed

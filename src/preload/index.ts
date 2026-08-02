@@ -2759,6 +2759,7 @@ const api = {
   updater: {
     getStatus: () => ipcRenderer.invoke('updater:getStatus'),
     getVersion: () => ipcRenderer.invoke('updater:getVersion'),
+    canAutoInstall: () => ipcRenderer.invoke('updater:canAutoInstall'),
     check: (options) => ipcRenderer.invoke('updater:check', options),
     download: () => ipcRenderer.invoke('updater:download'),
     dismissNudge: () => ipcRenderer.invoke('updater:dismissNudge'),
@@ -2785,6 +2786,11 @@ const api = {
       return () => ipcRenderer.removeListener('updater:clearDismissal', listener)
     }
   } satisfies PreloadApi['updater'],
+
+  license: {
+    getStatus: () => ipcRenderer.invoke('license:getStatus'),
+    activate: (token: string) => ipcRenderer.invoke('license:activate', token)
+  } satisfies PreloadApi['license'],
 
   notebook: {
     runPythonCell: (args: {

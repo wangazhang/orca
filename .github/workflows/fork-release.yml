@@ -1,0 +1,116 @@
+name: Fork Release
+
+# Why: upstream's release-cut.yml is gated to `stablyai/orca` and is wired to
+# that project's RC schedule, draft recovery, SignPath signing, and Homebrew
+# bump. None of that applies here, and editing it would conflict on every sync
+# from upstream. This is a standalone, minimal publisher for this fork.
+#
+# Flow: bump package.json + tag -> push tag -> three platform jobs build and
+# upload their installers plus the electron-updater manifests
+# (latest-mac.yml / latest.yml / latest-linux.yml) to the tag's GitHub release.
+# Those manifests are what the in-app updater reads; without them nothing
+# updates.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build and publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fork-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Why: keep this from running on upstream or on a fork-of-this-fork, where
+    # it would publish artifacts to a repo whose owner did not ask for them.
+    if: github.repository == 'wangazhang/orca'
+    timeout-minutes: 90
+    strategy:
+      # Why: one platform failing should not discard the installers that already
+      # built. A partial release is recoverable by re-running the failed job;
+      # a cancelled matrix is not.
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: --mac
+          - os: windows-latest
+            platform: --win
+          - os: ubuntu-latest
+            platform: --linux AppImage deb
+    runs-on: ${{ matrix.os }}
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      # Why: electron-updater compares the version inside latest-*.yml (which
+      # comes from package.json) against the version it resolved from the release
+      # tag. If they disagree, the update silently reports "not available" and
+      # the release looks broken with no error anywhere. Catch it before building.
+      - name: Verify tag matches package.json version
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          pkg_version="$(node -p "require('./package.json').version")"
+          if [[ "$TAG" != "v$pkg_version" ]]; then
+            echo "::error::Tag $TAG does not match package.json version $pkg_version. Bump package.json to ${TAG#v} and re-tag."
+            exit 1
+          fi
+          echo "Tag $TAG matches package.json version $pkg_version"
+
+      # Why: electron's postinstall downloads its binary from GitHub's CDN,
+      # which intermittently 504s. Retry so a transient error does not fail
+      # a release build.
+      - name: Install dependencies
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: pnpm install --frozen-lockfile
+
+      - name: Build desktop bundles
+        run: pnpm build:desktop
+
+      # Why: Windows needs the compiled CLI launcher and macOS the computer-use
+      # and notification-status helpers — electron-builder's extraResources
+      # reference those paths and packaging fails outright if they are missing.
+      - name: Build platform native helpers
+        run: pnpm build:native
+
+      - name: Package and publish
+        run: pnpm exec electron-builder --config config/electron-builder.config.cjs ${{ matrix.platform }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Why: this fork ships unsigned macOS builds. Without this, electron-builder
+          # searches the keychain, finds nothing, and fails the packaging step
+          # instead of producing the ad-hoc artifact we actually want. Signed
+          # releases would instead set ORCA_MAC_RELEASE=1 and supply CSC_LINK.
+          CSC_IDENTITY_AUTO_DISCOVERY: false

@@ -65,6 +65,8 @@ import { TelemetryFirstLaunchSurface } from './components/TelemetryFirstLaunchSu
 import { ZoomOverlay } from './components/ZoomOverlay'
 import { onOnboardingReopened } from './components/onboarding/show-onboarding-event'
 import { shouldShowOnboarding } from './components/onboarding/should-show-onboarding'
+import { LicenseGate } from './components/license/LicenseGate'
+import { useLicenseStatus } from './components/license/useLicenseStatus'
 import { MarkdownTemplatePicker } from './components/editor/MarkdownTemplatePicker'
 import { FloatingTerminalToggleButton } from './components/floating-terminal/FloatingTerminalToggleButton'
 import { OrcaProfileSwitcher } from './components/orca-profiles/OrcaProfileSwitcher'
@@ -703,6 +705,10 @@ function App(): React.JSX.Element {
   const [featureTipCliInstalled, setFeatureTipCliInstalled] = useState<boolean | null>(null)
   const [onboardingSettingsDetour, setOnboardingSettingsDetour] = useState(false)
   const shouldRenderOnboarding = onboarding !== null && shouldShowOnboarding(onboarding)
+  const { status: licenseStatus, refresh: refreshLicenseStatus } = useLicenseStatus()
+  // Why null is not blocked: the first status read is async, and gating on an
+  // unknown state would flash the license wall at every launch.
+  const licenseBlocked = licenseStatus !== null && !licenseStatus.usable
   const onboardingSettingsDetourActive =
     onboardingSettingsDetour && activeView === 'settings' && shouldRenderOnboarding
   if (onboardingSettingsDetour && !onboardingSettingsDetourActive) {
@@ -2857,7 +2863,13 @@ function App(): React.JSX.Element {
             >
               <CrashReportDialog />
             </RecoverableRenderErrorBoundary>
-            {onboarding && shouldRenderOnboarding && !onboardingSettingsDetourActive ? (
+            {licenseBlocked && licenseStatus ? (
+              <LicenseGate status={licenseStatus} onActivated={() => void refreshLicenseStatus()} />
+            ) : null}
+            {onboarding &&
+            shouldRenderOnboarding &&
+            !licenseBlocked &&
+            !onboardingSettingsDetourActive ? (
               <Suspense fallback={null}>
                 <RecoverableRenderErrorBoundary
                   boundaryId="modal.onboarding"

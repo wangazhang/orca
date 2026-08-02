@@ -27,6 +27,8 @@ import {
   setupAutoUpdater,
   dismissNudge
 } from '../updater'
+import { canAutoInstallUpdates } from '../updater-install-capability'
+import { activateLicense, getLicenseStatus } from '../license/license-service'
 import { scheduleHistoryGc } from '../terminal-history'
 import { hydrateLocalPtyRegistryAtBoot } from '../memory/hydrate-local-pty-registry'
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
@@ -455,9 +457,11 @@ export function registerUpdaterHandlers(_store: Store): void {
   ipcMain.removeHandler('updater:download')
   ipcMain.removeHandler('updater:quitAndInstall')
   ipcMain.removeHandler('updater:dismissNudge')
+  ipcMain.removeHandler('updater:canAutoInstall')
 
   ipcMain.handle('updater:getStatus', () => getUpdateStatus())
   ipcMain.handle('updater:getVersion', () => app.getVersion())
+  ipcMain.handle('updater:canAutoInstall', () => canAutoInstallUpdates())
   ipcMain.handle('updater:check', (_event, options?: UpdateCheckOptions) => {
     ensureAutoUpdaterConfigured()
     return checkForUpdatesFromMenu(options)
@@ -465,4 +469,9 @@ export function registerUpdaterHandlers(_store: Store): void {
   ipcMain.handle('updater:download', () => downloadUpdate())
   ipcMain.handle('updater:quitAndInstall', () => quitAndInstall())
   ipcMain.handle('updater:dismissNudge', () => dismissNudge())
+
+  ipcMain.removeHandler('license:getStatus')
+  ipcMain.removeHandler('license:activate')
+  ipcMain.handle('license:getStatus', () => getLicenseStatus())
+  ipcMain.handle('license:activate', (_event, token: string) => activateLicense(token))
 }

@@ -3,6 +3,10 @@ import { app, BrowserWindow, powerMonitor } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import type { UpdateCheckOptions, UpdateStatus } from '../shared/types'
 import { isWindowsSignatureCheckUnavailableFailure } from '../shared/updater-windows-signature-check'
+import { UPDATE_LATEST_DOWNLOAD_URL } from '../shared/update-feed-origin'
+import { canAutoInstallUpdates } from './updater-install-capability'
+import { MANUAL_INSTALL_REQUIRED_MESSAGE } from '../shared/updater-manual-install'
+import { isUpdateAllowedByLicense } from './updater-license-gate'
 import { killAllPty } from './ipc/pty'
 import { withUpdaterSpan } from './observability/instrumentation'
 import { loadElectronAutoUpdater, type ElectronAutoUpdater } from './electron-updater-loader'
@@ -1034,7 +1038,7 @@ async function pinDefaultReleaseFeed(
   } else {
     clearPrereleaseFallbackContext()
     clearPublishingWindowLastGoodCheck()
-    const url = 'https://github.com/stablyai/orca/releases/latest/download'
+    const url = UPDATE_LATEST_DOWNLOAD_URL
     console.info(
       `[updater] release feed fallback: current=${currentVersion} includePrerelease=${includePrerelease} → ${url}`
     )
@@ -1110,6 +1114,12 @@ function runBackgroundUpdateCheck(
     return
   }
   if (!app.isPackaged || is.dev) {
+    sendStatus({ state: 'not-available' })
+    return
+  }
+  // Why: an unlicensed install should not pull new builds. The gate lives here
+  // rather than in the UI so a background check cannot quietly bypass it.
+  if (!isUpdateAllowedByLicense()) {
     sendStatus({ state: 'not-available' })
     return
   }
@@ -1421,7 +1431,7 @@ export function setupAutoUpdater(
   // moving /latest redirect changing between check and download.
   autoUpdater.setFeedURL({
     provider: 'generic',
-    url: 'https://github.com/stablyai/orca/releases/latest/download'
+    url: UPDATE_LATEST_DOWNLOAD_URL
   })
 
   if (autoUpdaterInitialized) {
@@ -1506,6 +1516,14 @@ export function setupAutoUpdater(
 
 export function downloadUpdate(): void {
   if (downloadInFlight) {
+    return
+  }
+  // Why: on an unsigned macOS build the download would succeed and only fail at
+  // install time, stranding the user with a staged update that can never apply.
+  // Refuse up front with an actionable message; the UI offers a manual download
+  // link instead of this path.
+  if (!canAutoInstallUpdates()) {
+    sendErrorStatus(MANUAL_INSTALL_REQUIRED_MESSAGE)
     return
   }
   // Why: permit retry from 'error' when we still have a cached availableVersion —

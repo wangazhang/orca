@@ -9,6 +9,7 @@ import type {
   HostedReviewProvider
 } from '../shared/hosted-review'
 import type { NativeFileDropPayload } from '../shared/native-file-drop'
+import type { LicenseActivationResult, LicenseStatus } from '../shared/license-state'
 import type {
   TerminalTabCloseRequest,
   TerminalTabCloseResponse
@@ -2435,12 +2436,18 @@ export type PreloadApi = {
   updater: {
     getVersion: () => Promise<string>
     getStatus: () => Promise<UpdateStatus>
+    /** False when this build can only install updates manually (unsigned macOS). */
+    canAutoInstall: () => Promise<boolean>
     check: (options?: UpdateCheckOptions) => Promise<void>
     download: () => Promise<void>
     quitAndInstall: () => Promise<void>
     dismissNudge: () => Promise<void>
     onStatus: (callback: (status: UpdateStatus) => void) => () => void
     onClearDismissal: (callback: () => void) => () => void
+  }
+  license: {
+    getStatus: () => Promise<LicenseStatus>
+    activate: (token: string) => Promise<LicenseActivationResult>
   }
   notebook: {
     runPythonCell: (args: {

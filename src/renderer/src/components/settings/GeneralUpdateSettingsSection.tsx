@@ -8,6 +8,7 @@ import { SearchableSetting } from './SearchableSetting'
 import { SettingsSubsectionHeader } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
+import { releaseTagUrl } from '../../../../shared/update-feed-origin'
 
 export function GeneralUpdateSettingsSection(): React.JSX.Element {
   const updateStatus = useAppStore((s) => s.updateStatus)
@@ -168,10 +169,7 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
                 'is available. Click "Install Update" to download and install it.'
               )}{' '}
               <a
-                href={
-                  updateStatus.releaseUrl ??
-                  `https://github.com/stablyai/orca/releases/tag/v${updateStatus.version}`
-                }
+                href={updateStatus.releaseUrl ?? releaseTagUrl(updateStatus.version)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:text-foreground"
@@ -206,10 +204,7 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
                 'is ready to install.'
               )}{' '}
               <a
-                href={
-                  updateStatus.releaseUrl ??
-                  `https://github.com/stablyai/orca/releases/tag/v${updateStatus.version}`
-                }
+                href={updateStatus.releaseUrl ?? releaseTagUrl(updateStatus.version)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:text-foreground"

@@ -3,6 +3,7 @@
    scattering tightly coupled update behavior across multiple files. */
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import { useCanAutoInstallUpdates } from '@/hooks/useCanAutoInstallUpdates'
 import { useAppStore } from '../store'
 import { Card } from './ui/card'
 import { Button } from './ui/button'
@@ -23,6 +24,8 @@ import {
   isWindowsSignatureCheckUnavailableFailure,
   isWindowsSignatureMismatchFailure
 } from '../../../shared/updater-windows-signature-check'
+import { releaseTagUrl } from '../../../shared/update-feed-origin'
+import { isManualInstallRequiredFailure } from '../../../shared/updater-manual-install'
 import { translate } from '@/i18n/i18n'
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -32,9 +35,7 @@ function releaseUrlForVersion(version: string | null): string {
   // plain releases listing rather than /releases/latest — /latest also breaks
   // when GitHub's release API is degraded, and the listing is the most
   // reliable manual fallback.
-  return version
-    ? `https://github.com/stablyai/orca/releases/tag/v${version}`
-    : 'https://github.com/stablyai/orca/releases'
+  return releaseTagUrl(version)
 }
 
 function isAnimatedGif(url: string | undefined): boolean {
@@ -227,6 +228,7 @@ export function UpdateCard() {
 
   // ── Prefers-reduced-motion ──────────────────────────────────────────
   const prefersReducedMotion = usePrefersReducedMotion()
+  const canAutoInstall = useCanAutoInstallUpdates()
 
   const clearAnimationTimers = useCallback(() => {
     if (dismissAnimationTimerRef.current !== null) {
@@ -312,6 +314,13 @@ export function UpdateCard() {
   const isRichMode = changelog?.release != null
 
   const handleUpdate = () => {
+    // Why: builds that cannot install in place (unsigned macOS) must not start
+    // a download — it would only fail once staged. Send the user to the release
+    // page, which is the only path that can actually complete.
+    if (!canAutoInstall) {
+      void window.api.shell.openUrl(releaseUrlForVersion(cachedVersion))
+      return
+    }
     hasStartedDownload.current = true
     // Why: clicking "Update" implies the user is not worried about interruption,
     // so dismiss the reassurance tip permanently.
@@ -366,86 +375,110 @@ export function UpdateCard() {
     status.state === 'error' && isWindowsSignatureMismatchFailure(status.message)
   const isSignatureCheckBlockedError =
     status.state === 'error' && isWindowsSignatureCheckUnavailableFailure(status.message)
+  const isManualInstallError =
+    status.state === 'error' && isManualInstallRequiredFailure(status.message)
   const errorCard: ErrorCardModel | null =
     status.state === 'error'
-      ? isHttp2UpdateError
+      ? isManualInstallError
         ? {
-            variant: 'http1Compatibility',
-            title: translate('auto.components.UpdateCard.1339b82cee', 'HTTP/2 Download Blocked'),
-            summary: 'Orca can retry through HTTP/1.1 compatibility mode.',
-            explainer: translate(
-              'auto.components.UpdateCard.90559b14e3',
-              'This turns on a process-wide Electron networking switch after restart. Use it for corporate VPNs or proxies that reject HTTP/2 update downloads.'
+            // Why: not a failure — this build simply cannot install in place, so
+            // the only useful action is the release page. Showing the raw
+            // sentinel here would leak an internal marker to the user.
+            title: translate(
+              'auto.components.UpdateCard.manualInstallTitle',
+              'Manual Install Required'
             ),
-            detail: compatibilitySetupError ?? status.message,
+            summary: translate(
+              'auto.components.UpdateCard.manualInstallSummary',
+              'This build cannot update itself. Download the new version and replace Orca in Applications.'
+            ),
             releaseUrl: releaseUrlForVersion(cachedVersion),
             primaryAction: {
-              label: translate('auto.components.UpdateCard.933c6fdf5b', 'Enable & Restart'),
-              pendingLabel: 'Restarting...',
-              isPending: compatibilityRelaunching,
-              onClick: handleEnableHttp1Compatibility
+              label: translate('auto.components.UpdateCard.manualDownload', 'Download update'),
+              onClick: () => void window.api.shell.openUrl(releaseUrlForVersion(cachedVersion))
             }
           }
-        : isSignatureMismatchError
+        : isHttp2UpdateError
           ? {
-              // Security stop: the installer is readable but signed by the wrong
-              // publisher. No retry — only a path to the verified download.
-              variant: 'security',
-              title: translate('auto.components.UpdateCard.5b309b19f3', "Update Wasn't Installed"),
-              summary: translate(
-                'auto.components.UpdateCard.092f09fc14',
-                "The installer's publisher doesn't match Orca, so we stopped the update. Don't install this download; check official releases for a corrected version."
+              variant: 'http1Compatibility',
+              title: translate('auto.components.UpdateCard.1339b82cee', 'HTTP/2 Download Blocked'),
+              summary: 'Orca can retry through HTTP/1.1 compatibility mode.',
+              explainer: translate(
+                'auto.components.UpdateCard.90559b14e3',
+                'This turns on a process-wide Electron networking switch after restart. Use it for corporate VPNs or proxies that reject HTTP/2 update downloads.'
               ),
-              detail: status.message,
-              // Why: linking the rejected version directly would invite users
-              // to bypass the publisher check by running the same installer.
-              releaseUrl: releaseUrlForVersion(null),
-              manualLabel: translate(
-                'auto.components.UpdateCard.c9ff9b9ec2',
-                'Check official releases'
-              )
+              detail: compatibilitySetupError ?? status.message,
+              releaseUrl: releaseUrlForVersion(cachedVersion),
+              primaryAction: {
+                label: translate('auto.components.UpdateCard.933c6fdf5b', 'Enable & Restart'),
+                pendingLabel: 'Restarting...',
+                isPending: compatibilityRelaunching,
+                onClick: handleEnableHttp1Compatibility
+              }
             }
-          : isSignatureCheckBlockedError
+          : isSignatureMismatchError
             ? {
+                // Security stop: the installer is readable but signed by the wrong
+                // publisher. No retry — only a path to the verified download.
+                variant: 'security',
                 title: translate(
-                  'auto.components.UpdateCard.e944c2de43',
-                  'Update Verification Blocked'
+                  'auto.components.UpdateCard.5b309b19f3',
+                  "Update Wasn't Installed"
                 ),
                 summary: translate(
-                  'auto.components.UpdateCard.a05992a26b',
-                  "The signature check couldn't run — usually because antivirus software blocked it. Retry the download, or get the installer from our official releases."
+                  'auto.components.UpdateCard.092f09fc14',
+                  "The installer's publisher doesn't match Orca, so we stopped the update. Don't install this download; check official releases for a corrected version."
                 ),
                 detail: status.message,
-                releaseUrl: releaseUrlForVersion(cachedVersion),
-                primaryAction: {
-                  label: translate('auto.components.UpdateCard.48565a32bc', 'Retry Download'),
-                  onClick: handleUpdate
+                // Why: linking the rejected version directly would invite users
+                // to bypass the publisher check by running the same installer.
+                releaseUrl: releaseUrlForVersion(null),
+                manualLabel: translate(
+                  'auto.components.UpdateCard.c9ff9b9ec2',
+                  'Check official releases'
+                )
+              }
+            : isSignatureCheckBlockedError
+              ? {
+                  title: translate(
+                    'auto.components.UpdateCard.e944c2de43',
+                    'Update Verification Blocked'
+                  ),
+                  summary: translate(
+                    'auto.components.UpdateCard.a05992a26b',
+                    "The signature check couldn't run — usually because antivirus software blocked it. Retry the download, or get the installer from our official releases."
+                  ),
+                  detail: status.message,
+                  releaseUrl: releaseUrlForVersion(cachedVersion),
+                  primaryAction: {
+                    label: translate('auto.components.UpdateCard.48565a32bc', 'Retry Download'),
+                    onClick: handleUpdate
+                  }
                 }
-              }
-            : {
-                // Why: title is scoped to the operation that failed so check-time
-                // failures (commonly GitHub-side) don't read as a bug in Orca.
-                title: cachedVersion ? 'Update Error' : 'Update Check Failed',
-                summary: cachedVersion
-                  ? 'Could not complete the update.'
-                  : 'Could not check for updates.',
-                detail: status.message,
-                releaseUrl: releaseUrlForVersion(cachedVersion),
-                // Why: check-time failures are often transient (offline, GitHub
-                // hiccup), so offer a Re-check next to "Download Manually" instead
-                // of forcing the user into the manual fallback.
-                primaryAction: cachedVersion
-                  ? {
-                      label: translate('auto.components.UpdateCard.48565a32bc', 'Retry Download'),
-                      onClick: handleUpdate
-                    }
-                  : {
-                      label: translate('auto.components.UpdateCard.6b0085010d', 'Re-check'),
-                      onClick: () => {
-                        void window.api.updater.check({ includePrerelease: false })
+              : {
+                  // Why: title is scoped to the operation that failed so check-time
+                  // failures (commonly GitHub-side) don't read as a bug in Orca.
+                  title: cachedVersion ? 'Update Error' : 'Update Check Failed',
+                  summary: cachedVersion
+                    ? 'Could not complete the update.'
+                    : 'Could not check for updates.',
+                  detail: status.message,
+                  releaseUrl: releaseUrlForVersion(cachedVersion),
+                  // Why: check-time failures are often transient (offline, GitHub
+                  // hiccup), so offer a Re-check next to "Download Manually" instead
+                  // of forcing the user into the manual fallback.
+                  primaryAction: cachedVersion
+                    ? {
+                        label: translate('auto.components.UpdateCard.48565a32bc', 'Retry Download'),
+                        onClick: handleUpdate
                       }
-                    }
-              }
+                    : {
+                        label: translate('auto.components.UpdateCard.6b0085010d', 'Re-check'),
+                        onClick: () => {
+                          void window.api.updater.check({ includePrerelease: false })
+                        }
+                      }
+                }
       : installError
         ? {
             title: translate('auto.components.UpdateCard.4cf109845a', 'Update Error'),
@@ -634,6 +667,7 @@ export function UpdateCard() {
           onMediaError={() => setMediaFailed(true)}
           onMediaLoad={() => setMediaLoaded(true)}
           onUpdate={handleUpdate}
+          canAutoInstall={canAutoInstall}
           onClose={handleDismissWithAnimation}
         />
       )
@@ -644,6 +678,7 @@ export function UpdateCard() {
         version={status.version}
         releaseUrl={releaseUrl}
         onUpdate={handleUpdate}
+        canAutoInstall={canAutoInstall}
         onClose={handleDismissWithAnimation}
       />
     )
@@ -709,6 +744,7 @@ function RichCardContent({
   onMediaError,
   onMediaLoad,
   onUpdate,
+  canAutoInstall,
   onClose
 }: {
   release: NonNullable<ChangelogData['release']>
@@ -719,6 +755,7 @@ function RichCardContent({
   onMediaError: () => void
   onMediaLoad: () => void
   onUpdate: () => void
+  canAutoInstall: boolean
   onClose: () => void
 }) {
   const showMedia =
@@ -790,7 +827,9 @@ function RichCardContent({
       </button>
 
       <Button variant="default" size="sm" onClick={onUpdate} className="w-full cursor-pointer">
-        {translate('auto.components.UpdateCard.ec8fe71cfc', 'Update')}
+        {canAutoInstall
+          ? translate('auto.components.UpdateCard.ec8fe71cfc', 'Update')
+          : translate('auto.components.UpdateCard.manualDownload', 'Download update')}
       </Button>
     </div>
   )
@@ -802,11 +841,13 @@ function SimpleCardContent({
   version,
   releaseUrl,
   onUpdate,
+  canAutoInstall,
   onClose
 }: {
   version: string
   releaseUrl: string
   onUpdate: () => void
+  canAutoInstall: boolean
   onClose: () => void
 }) {
   return (
@@ -833,7 +874,12 @@ function SimpleCardContent({
       </p>
 
       <p className="text-xs leading-relaxed text-muted-foreground">
-        {translate('auto.components.UpdateCard.fdd4a364fa', "Sessions won't be interrupted.")}
+        {canAutoInstall
+          ? translate('auto.components.UpdateCard.fdd4a364fa', "Sessions won't be interrupted.")
+          : translate(
+              'auto.components.UpdateCard.manualInstallHint',
+              'This build installs manually: download it, replace Orca in Applications, then reopen. On first launch, right-click the app and choose Open.'
+            )}
       </p>
 
       <button
@@ -849,7 +895,9 @@ function SimpleCardContent({
         onClick={onUpdate}
         className="mt-0.5 w-full cursor-pointer"
       >
-        {translate('auto.components.UpdateCard.ec8fe71cfc', 'Update')}
+        {canAutoInstall
+          ? translate('auto.components.UpdateCard.ec8fe71cfc', 'Update')
+          : translate('auto.components.UpdateCard.manualDownload', 'Download update')}
       </Button>
     </div>
   )

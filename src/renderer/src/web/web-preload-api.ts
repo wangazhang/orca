@@ -735,6 +735,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     developerPermissions: createDeveloperPermissionsApi(),
     computerUsePermissions: createComputerUsePermissionsApi(),
     updater: createUpdaterApi(),
+    license: createLicenseApi(),
     shell: createShellApi(),
     skills: createSkillsApi(),
     pty: createPtyApi(),
@@ -2869,12 +2870,36 @@ function createUpdaterApi(): NonNullable<Partial<PreloadApi>['updater']> {
   return {
     getVersion: () => Promise.resolve('web'),
     getStatus: () => Promise.resolve({ state: 'idle' } as never),
+    // The web build is served, not installed, so there is nothing to update in
+    // place — but the flag drives UI copy, and "manual download" is misleading
+    // here. Report the in-place path so no install instructions are shown.
+    canAutoInstall: () => Promise.resolve(true),
     check: () => Promise.resolve(),
     download: () => Promise.resolve(),
     quitAndInstall: () => Promise.resolve(),
     dismissNudge: () => Promise.resolve(),
     onStatus: () => noopUnsubscribe,
     onClearDismissal: () => noopUnsubscribe
+  }
+}
+
+function createLicenseApi(): NonNullable<Partial<PreloadApi>['license']> {
+  return {
+    // Licensing is enforced by the desktop app around its own install. The web
+    // build has no userData to hold a license, so report an unenforced status
+    // rather than a missing one — otherwise the gate would block the whole app.
+    getStatus: () =>
+      Promise.resolve({
+        state: 'valid',
+        daysRemaining: null,
+        expiresAt: null,
+        licensee: null,
+        usable: true,
+        shouldWarn: false,
+        machineId: '',
+        enforced: false
+      }),
+    activate: () => Promise.resolve({ ok: false, reason: 'invalid' })
   }
 }
 

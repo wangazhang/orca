@@ -191,11 +191,12 @@ module.exports = {
   },
   win: {
     executableName: 'Orca',
-    // Why: Windows installers are signed after electron-builder packaging by
-    // SignPath, so the packager cannot infer the updater publisherName.
-    signtoolOptions: {
-      publisherName: 'SignPath Foundation'
-    },
+    // Why: no `signtoolOptions.publisherName` here on purpose. electron-updater
+    // reads that value out of app-update.yml and runs an Authenticode check
+    // against it before installing. This fork ships unsigned Windows
+    // installers, so declaring a publisher would make every update fail
+    // signature verification. Set it back the moment installers get signed —
+    // omitting it skips the check, which is only acceptable while unsigned.
     extraResources: [
       ...commonExtraResources,
       winSpeechNativeResource,
@@ -395,7 +396,7 @@ module.exports = {
   npmRebuild: true,
   publish: {
     provider: 'github',
-    owner: 'stablyai',
+    owner: 'wangazhang',
     repo: 'orca',
     releaseType: 'release'
   }

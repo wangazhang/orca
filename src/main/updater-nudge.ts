@@ -1,5 +1,6 @@
 import { net } from 'electron'
 import { compareVersions, isValidVersion } from './updater-fallback'
+import { UPDATE_CHANGELOG_BASE_URL } from '../shared/update-feed-origin'
 
 export type NudgeConfig = {
   id: string
@@ -8,8 +9,14 @@ export type NudgeConfig = {
 }
 
 export async function fetchNudge(): Promise<NudgeConfig | null> {
+  // Why: nudge JSON is served by upstream's own site. This fork has no such
+  // service, and firing the request anyway would send every install's update
+  // check to a third-party host for a response that can only be discarded.
+  if (!UPDATE_CHANGELOG_BASE_URL) {
+    return null
+  }
   try {
-    const res = await net.fetch('https://onorca.dev/whats-new/nudge.json', {
+    const res = await net.fetch(`${UPDATE_CHANGELOG_BASE_URL}/whats-new/nudge.json`, {
       signal: AbortSignal.timeout(5000)
     })
     if (!res.ok) {

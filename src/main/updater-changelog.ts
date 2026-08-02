@@ -1,6 +1,7 @@
 import { net } from 'electron'
 import type { ChangelogData } from '../shared/types'
 import { compareVersions } from './updater-fallback'
+import { UPDATE_CHANGELOG_BASE_URL } from '../shared/update-feed-origin'
 
 type ChangelogEntry = {
   version: string
@@ -10,7 +11,7 @@ type ChangelogEntry = {
   releaseNotesUrl: string
 }
 
-const CHANGELOG_URL = 'https://onorca.dev/changelog'
+const CHANGELOG_URL = `${UPDATE_CHANGELOG_BASE_URL}/changelog`
 
 function isValidEntry(entry: ChangelogEntry): boolean {
   return (
@@ -42,7 +43,14 @@ export async function fetchChangelog(
   incomingVersion: string,
   localVersion: string
 ): Promise<ChangelogData | null> {
-  const res = await net.fetch('https://onorca.dev/whats-new/changelog.json', {
+  // Why: the changelog JSON is served by upstream's own site. This fork has no
+  // such service, so skip the request entirely rather than sending every update
+  // check to a third-party host for a response that can only be discarded.
+  // Callers already treat null as "no rich card" and fall back to the plain one.
+  if (!UPDATE_CHANGELOG_BASE_URL) {
+    return null
+  }
+  const res = await net.fetch(`${UPDATE_CHANGELOG_BASE_URL}/whats-new/changelog.json`, {
     signal: AbortSignal.timeout(5000)
   })
   if (!res.ok) {
