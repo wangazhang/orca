@@ -15,6 +15,7 @@ import {
   getPRGroupKey,
   getProjectGroupHeaderKey,
   PINNED_GROUP_KEY,
+  STRUCTURED_REPOS_FOLDER_META,
   type PendingCreationRef
 } from './worktree-list-groups'
 import {
@@ -3691,8 +3692,10 @@ describe('buildRows pending creations', () => {
 })
 
 describe('buildRows — structured projects', () => {
-  // A shared source repo (one orca Repo) with two worktrees, one per workspace,
-  // each checked out under <wsDir>/src/mrs — the structured layout.
+  // A shared source repo (one orca Repo) with two worktrees, one per workspace.
+  // These deliberately use the LEGACY <wsDir>/src/mrs layout: workspaces created
+  // before the src → repos rename keep those absolute paths in workspace.json, so
+  // this fixture doubles as back-compat coverage for the grouping predicate.
   const structuredRepo: Repo = {
     id: 'repo-mrs',
     path: '/src/mrs',
@@ -3769,7 +3772,7 @@ describe('buildRows — structured projects', () => {
   it('wraps each workspace in a repos folder; expanded shows each mounted repo as a leaf row', () => {
     const rows = buildStructuredRows(bothReposFoldersExpanded)
 
-    // Each workspace gets its own collapsible "src" folder.
+    // Each workspace gets its own collapsible "repos" folder.
     const folderKeys = rows
       .filter((row) => row.type === 'header' && row.key.startsWith('struct-repos-folder:'))
       .map((row) => (row.type === 'header' ? row.key : ''))
@@ -3789,9 +3792,50 @@ describe('buildRows — structured projects', () => {
     expect(ws1Item?.type === 'item' && ws1Item.sectionKey).toBe('struct-repo:ws1:repo-mrs')
     expect(ws2Item?.type === 'item' && ws2Item.sectionKey).toBe('struct-repo:ws2:repo-mrs')
     // The leaf stands in for the mounted repo, so its visible title is the repo
-    // folder name ("mrs"), not the redundant per-workspace branch/worktree name.
-    expect(ws1Item?.type === 'item' && ws1Item.titleOverride).toBe('mrs')
-    expect(ws2Item?.type === 'item' && ws2Item.titleOverride).toBe('mrs')
+    // folder name plus the branch it has checked out — self-describing without
+    // the redundant per-workspace worktree name.
+    expect(ws1Item?.type === 'item' && ws1Item.titleOverride).toBe('mrs (workspace-1)')
+    expect(ws2Item?.type === 'item' && ws2Item.titleOverride).toBe('mrs (workspace-2)')
+  })
+
+  it('labels the folder "repos" with the Database icon', () => {
+    const rows = buildStructuredRows(bothReposFoldersExpanded)
+    const folder = rows.find(
+      (row) => row.type === 'header' && row.key === 'struct-repos-folder:ws1'
+    )
+    expect(folder?.type === 'header' && folder.label).toBe('repos')
+    expect(folder?.type === 'header' && folder.icon).toBe(STRUCTURED_REPOS_FOLDER_META.icon)
+  })
+
+  it('groups repos mounted under the current repos/ layout, not just legacy src/', () => {
+    // Same shape as the legacy fixture but on the post-rename path, proving the
+    // predicate accepts both segment names.
+    const reposWt: Worktree = {
+      ...worktree,
+      id: 'repo-mrs::/root/penguin-x/workspace-1/repos/mrs',
+      repoId: structuredRepo.id,
+      path: '/root/penguin-x/workspace-1/repos/mrs',
+      branch: 'refs/heads/workspace-1',
+      displayName: 'workspace-1'
+    }
+    const rows = buildRows(
+      'repo',
+      [reposWt],
+      structuredRepoMap,
+      null,
+      new Set(['struct-repos-folder:ws1']),
+      undefined,
+      undefined,
+      'manual',
+      {},
+      undefined,
+      false,
+      undefined,
+      structuredGroups
+    )
+    const item = rows.find((row) => row.type === 'item' && row.worktree.id === reposWt.id)
+    expect(item?.type === 'item' && item.sectionKey).toBe('struct-repo:ws1:repo-mrs')
+    expect(item?.type === 'item' && item.titleOverride).toBe('mrs (workspace-1)')
   })
 
   it('collapses the repos folder by default, hiding the mounted repos until expanded', () => {
@@ -3868,7 +3912,7 @@ describe('buildRows — structured projects', () => {
       rows.some((row) => row.type === 'header' && row.key === 'struct-repo:ws2:repo-mrs')
     ).toBe(false)
     const ws2Item = rows.find((row) => row.type === 'item' && row.worktree.id === wt2.id)
-    expect(ws2Item?.type === 'item' && ws2Item.titleOverride).toBe('mrs')
+    expect(ws2Item?.type === 'item' && ws2Item.titleOverride).toBe('mrs (workspace-2)')
   })
 
   it('getGroupKeysForWorktree returns the workspace group, repos folder, and struct-repo keys for reveal', () => {

@@ -14,6 +14,7 @@ import { importStructuredProjectService } from './structured-project-import'
 import { scanAllStructuredProjects } from './structured-project-scan'
 import { readRegisteredRoots } from './structured-project-roots'
 import { getProjectsDir } from './structured-project-paths'
+import { workspaceRepoDir } from './structured-project-layout'
 import { listStructuredProjectsService, resolveProject } from './structured-project-service'
 import {
   materializeAllStructuredProjects,
@@ -110,7 +111,7 @@ beforeAll(async () => {
 
   // Real per-workspace git worktree on the workspace branch.
   wsDir = join(externalRoot, WORKSPACE)
-  worktreePath = join(wsDir, 'src', 'qa-pk')
+  worktreePath = workspaceRepoDir(wsDir, 'qa-pk')
   git(sourceRepo, 'worktree', 'add', '-q', '-b', WORKSPACE, worktreePath)
 
   // Reflect the mounted repo in the on-disk source of truth.

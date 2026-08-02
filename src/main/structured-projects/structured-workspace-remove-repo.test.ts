@@ -10,7 +10,7 @@ import {
 } from './structured-project-service'
 import { removeStructuredWorkspaceRepoService } from './structured-workspace-remove-repo'
 import { readProjectFile, readWorkspaceFile } from './structured-project-disk'
-import { srcRepoDir, workspaceDir } from './structured-project-layout'
+import { workspaceRepoDir, workspaceDir } from './structured-project-layout'
 
 // The service resolves ~/orca/projects via os.homedir(); point HOME at a temp
 // dir so the whole flow runs on real filesystem without touching real data.
@@ -57,7 +57,7 @@ describe('removeStructuredWorkspaceRepoService (real git)', () => {
     })
 
     const wsDir = workspaceDir(join(projectsDir(), 'P'), 'w1')
-    const target = srcRepoDir(wsDir, 'qa-pk')
+    const target = workspaceRepoDir(wsDir, 'qa-pk')
     expect(existsSync(target)).toBe(true)
 
     const result = await removeStructuredWorkspaceRepoService({
@@ -91,7 +91,7 @@ describe('removeStructuredWorkspaceRepoService (real git)', () => {
 
     const wsDir = workspaceDir(join(projectsDir(), 'P'), 'w1')
     // Remove the working directory out from under the service (stale git admin).
-    rmSync(srcRepoDir(wsDir, 'qa-pk'), { recursive: true, force: true })
+    rmSync(workspaceRepoDir(wsDir, 'qa-pk'), { recursive: true, force: true })
 
     const result = await removeStructuredWorkspaceRepoService({
       project: 'P',

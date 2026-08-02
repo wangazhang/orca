@@ -18,7 +18,10 @@ import type {
 const project: StructuredProjectFile = {
   name: 'Penguin-go',
   members: [{ repoId: 'qa-pk', source: '/abs/qa-pk', defaultBranch: 'main' }],
-  services: ['mysql', 'redis'],
+  services: [
+    { name: 'mysql', kind: 'mysql' },
+    { name: 'redis', kind: 'redis' }
+  ],
   createdAt: '2026-07-04T00:21:40.326089+00:00'
 }
 
@@ -27,7 +30,7 @@ const workspace: StructuredWorkspaceFile = {
   project: 'Penguin-go',
   worktrees: [{ repoId: 'qa-pk', path: '/abs/Penguin-go/youho/src/qa-pk', branch: 'youho' }],
   infraMode: 'isolated',
-  services: [{ kind: 'mysql', hostPort: 61918 }],
+  services: [{ name: 'mysql', kind: 'mysql', hostPort: 61918 }],
   createdAt: '2026-07-04T00:23:16.436882+00:00'
 }
 

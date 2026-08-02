@@ -11,27 +11,90 @@
  */
 import { z } from 'zod'
 
-// Infra services a workspace can provision an isolated sandbox for. Kept as a
-// closed enum so compose generation can switch exhaustively per kind.
-export const STRUCTURED_SERVICE_KINDS = ['mysql', 'redis', 'postgres', 'mongo'] as const
+// Built-in infra middleware a workspace can provision a sandbox for. Kept as a
+// closed enum so the compose generator has an image/port table entry for each.
+// Custom (user-defined) middleware lives outside this enum — see the service
+// spec below, whose `kind` is null for those.
+export const STRUCTURED_SERVICE_KINDS = [
+  'mysql',
+  'redis',
+  'postgres',
+  'mongo',
+  'rocketmq',
+  'kafka',
+  'elasticsearch',
+  'nacos'
+] as const
 export type StructuredServiceKind = (typeof STRUCTURED_SERVICE_KINDS)[number]
 
 export const structuredServiceKindSchema = z.enum(STRUCTURED_SERVICE_KINDS)
 
+// A provisionable sandbox service. A preset carries a built-in `kind` (image and
+// port come from the compose generator's table); a custom service sets kind=null
+// and supplies its own image/containerPort. `name` is the unique key, the compose
+// service name, and the env-var prefix — for presets it equals the kind.
+const serviceSpecBaseSchema = z.object({
+  name: z.string().min(1),
+  kind: structuredServiceKindSchema.nullable(),
+  image: z.string().min(1).optional(),
+  containerPort: z.number().int().positive().optional(),
+  command: z.string().optional()
+})
+
+// A custom service (kind=null) must carry its own image; presets get theirs from
+// the built-in table, so image is optional for them.
+function serviceSpecHasImageWhenCustom(spec: { kind: unknown; image?: string }): boolean {
+  return spec.kind !== null || Boolean(spec.image)
+}
+
+const CUSTOM_SERVICE_IMAGE_MESSAGE = 'custom service requires an image'
+
+export const structuredServiceSpecSchema = serviceSpecBaseSchema.refine(
+  serviceSpecHasImageWhenCustom,
+  { message: CUSTOM_SERVICE_IMAGE_MESSAGE }
+)
+export type StructuredServiceSpec = z.infer<typeof structuredServiceSpecSchema>
+
+// One middleware surfaced by the config-fingerprint scan, with the evidence that
+// triggered it so the UI can explain "why this was pre-checked".
+export type ServiceDetectionEvidence = {
+  // Absolute path of the scanned repo whose config matched.
+  path: string
+  // Repo-relative config file the signal was found in.
+  file: string
+  // The literal signal that matched (e.g. "jdbc:mysql").
+  signal: string
+}
+
+export type DetectedService = {
+  kind: StructuredServiceKind
+  evidence: ServiceDetectionEvidence[]
+}
+
 // ─── project.json ───────────────────────────────────────────────────
 
 const projectMemberSchema = z.object({
-  // Human-readable repo key used as the src/<repoId> directory name.
+  // Human-readable repo key used as the repos/<repoId> directory name.
   repoId: z.string().min(1),
   // Absolute path or remote URL the worktree is created from.
   source: z.string().min(1),
   defaultBranch: z.string().min(1)
 })
 
+// Back-compat: older project.json stored services as a bare kind-string array
+// (e.g. ["mysql","redis"]). Normalize each element to a spec before validation
+// so those files still load — disk is the hand-editable source of truth.
+const projectServiceSchema = z.preprocess((value) => {
+  if (typeof value === 'string') {
+    return { name: value, kind: value }
+  }
+  return value
+}, structuredServiceSpecSchema)
+
 export const structuredProjectFileSchema = z.object({
   name: z.string().min(1),
   members: z.array(projectMemberSchema),
-  services: z.array(structuredServiceKindSchema),
+  services: z.array(projectServiceSchema),
   createdAt: z.string().min(1)
 })
 
@@ -46,11 +109,29 @@ const workspaceWorktreeSchema = z.object({
   branch: z.string().min(1)
 })
 
-// Per-service host port assignment for the workspace's isolated sandbox.
-const workspaceServiceSchema = z.object({
-  kind: structuredServiceKindSchema,
+// Per-service host port assignment for the workspace's isolated sandbox. Carries
+// the full service spec (so custom middleware keeps its image/port) plus the
+// allocated host port.
+const workspaceServiceObjectSchema = serviceSpecBaseSchema.extend({
   hostPort: z.number().int().positive()
 })
+
+// Back-compat: older workspace.json stored { kind, hostPort } without a name.
+// Fill name from kind before validation so those files still load.
+const workspaceServiceSchema = z.preprocess(
+  (value) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const record = value as Record<string, unknown>
+      if (!('name' in record) && typeof record.kind === 'string') {
+        return { ...record, name: record.kind }
+      }
+    }
+    return value
+  },
+  workspaceServiceObjectSchema.refine(serviceSpecHasImageWhenCustom, {
+    message: CUSTOM_SERVICE_IMAGE_MESSAGE
+  })
+)
 
 // 'isolated' = each workspace gets its own sandbox + ports; 'shared' reserved
 // for a future project-wide single sandbox.

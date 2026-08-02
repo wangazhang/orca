@@ -39,18 +39,25 @@ export async function copyStructuredWorkspaceService(params: {
   }
   const source = sourceRead.value
 
-  // Scaffold the copy reusing the SOURCE's service kinds so it provisions the
-  // same infra — but createStructuredWorkspace allocates its own host ports, so
-  // the copy never collides with the original's running containers.
+  // Scaffold the copy reusing the SOURCE's service specs so it provisions the
+  // same infra (including custom middleware) — but createStructuredWorkspace
+  // allocates its own host ports, so the copy never collides with the original's
+  // running containers. Drop hostPort; keep the rest of each spec.
   const { workspace } = await createStructuredWorkspace({
     rootPath,
     projectName: project.name,
     workspaceName: params.name,
-    services: source.services.map((service) => service.kind)
+    services: source.services.map((service) => ({
+      name: service.name,
+      kind: service.kind,
+      image: service.image,
+      containerPort: service.containerPort,
+      command: service.command
+    }))
   })
 
   // Remount each source worktree onto the new workspace's branch. addWorkspaceRepoService
-  // owns the mount path (mountRepoIntoWorkspace + srcRepoDir, branch = workspace name),
+  // owns the mount path (mountRepoIntoWorkspace + workspaceRepoDir, branch = workspace name),
   // so reusing it keeps the copy byte-identical to a hand-added repo.
   for (const worktree of source.worktrees) {
     const member = project.members.find((m) => m.repoId === worktree.repoId)

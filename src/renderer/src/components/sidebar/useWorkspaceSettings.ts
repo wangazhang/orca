@@ -4,11 +4,29 @@ import { useAppStore } from '@/store'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import type {
-  StructuredServiceKind,
+  StructuredServiceSpec,
   StructuredWorkspaceService,
   StructuredWorkspaceWorktree
 } from '../../../../shared/structured-project-schema'
 import { translate } from '@/i18n/i18n'
+import { useSandboxServiceSelection } from './useSandboxServiceSelection'
+import type { SandboxServiceSelection } from './useSandboxServiceSelection'
+
+// Canonical, order- and hostPort-independent key for a service set, so Save can
+// tell whether the sandbox selection actually changed against the loaded snapshot.
+function servicesKey(specs: readonly StructuredServiceSpec[]): string {
+  return JSON.stringify(
+    specs
+      .map((spec) => ({
+        name: spec.name,
+        kind: spec.kind,
+        image: spec.image,
+        containerPort: spec.containerPort,
+        command: spec.command
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  )
+}
 
 // One editable row in the mounted-repo list. `isNew` marks a repo picked this
 // session (added via iteration.workspaceAddRepo on Save); existing rows carry
@@ -28,8 +46,7 @@ export type WorkspaceSettings = {
   workspace: string
   loading: boolean
   loadError: string | null
-  services: Set<StructuredServiceKind>
-  toggleService: (kind: StructuredServiceKind) => void
+  sandbox: SandboxServiceSelection
   repos: DraftRepo[]
   removeRepo: (key: string) => void
   handleAddRepo: () => void
@@ -59,14 +76,19 @@ export function useWorkspaceSettings(): WorkspaceSettings {
 
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  // Draft state — the loaded snapshot is the baseline; Save diffs against it.
-  const [initialServices, setInitialServices] = useState<Set<StructuredServiceKind>>(new Set())
-  const [services, setServices] = useState<Set<StructuredServiceKind>>(new Set())
+  // Sandbox middleware selection (presets + auto-detect + custom), shared with
+  // the create wizard. Seeded from disk on open; `initialServicesKey` is the
+  // baseline Save diffs against.
+  const sandbox = useSandboxServiceSelection({ target })
+  const [initialServicesKey, setInitialServicesKey] = useState('[]')
   const [initialRepoIds, setInitialRepoIds] = useState<Set<string>>(new Set())
   const [repos, setRepos] = useState<DraftRepo[]>([])
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const seed = sandbox.seed
+  const runDetect = sandbox.runDetect
 
   // Load the workspace's current services + mounted repos from disk on open.
   useEffect(() => {
@@ -80,6 +102,7 @@ export function useWorkspaceSettings(): WorkspaceSettings {
       try {
         const result = await callRuntimeRpc<{
           project?: {
+            members?: { source: string }[]
             workspaces?: {
               name: string
               services?: StructuredWorkspaceService[]
@@ -91,18 +114,23 @@ export function useWorkspaceSettings(): WorkspaceSettings {
           return
         }
         const ws = result.project?.workspaces?.find((entry) => entry.name === workspace)
-        const loadedServices = new Set((ws?.services ?? []).map((service) => service.kind))
+        const loadedServices = ws?.services ?? []
         const loadedRepos: DraftRepo[] = (ws?.worktrees ?? []).map((worktree) => ({
           key: worktree.repoId,
           repoId: worktree.repoId,
           branch: worktree.branch ?? '',
           isNew: false
         }))
-        setInitialServices(loadedServices)
-        setServices(new Set(loadedServices))
+        seed(loadedServices)
+        setInitialServicesKey(servicesKey(loadedServices))
         setInitialRepoIds(new Set(loadedRepos.map((repo) => repo.repoId)))
         setRepos(loadedRepos)
         setLoading(false)
+        // Suggest middleware from the project's member repos on disk.
+        const memberSources = (result.project?.members ?? []).map((member) => member.source)
+        if (memberSources.length > 0) {
+          runDetect(memberSources)
+        }
       } catch (err) {
         if (!cancelled && mountedRef.current) {
           setLoadError(err instanceof Error ? err.message : String(err))
@@ -113,20 +141,7 @@ export function useWorkspaceSettings(): WorkspaceSettings {
     return () => {
       cancelled = true
     }
-  }, [isOpen, project, workspace, target, mountedRef])
-
-  const toggleService = useCallback((kind: StructuredServiceKind) => {
-    setServices((prev) => {
-      const next = new Set(prev)
-      if (next.has(kind)) {
-        next.delete(kind)
-      } else {
-        next.add(kind)
-      }
-      return next
-    })
-    setError(null)
-  }, [])
+  }, [isOpen, project, workspace, target, mountedRef, seed, runDetect])
 
   const removeRepo = useCallback((key: string) => {
     setRepos((prev) => prev.filter((repo) => repo.key !== key))
@@ -178,17 +193,8 @@ export function useWorkspaceSettings(): WorkspaceSettings {
     }
   }, [adding, busy, target, mountedRef])
 
-  const servicesChanged = useMemo(() => {
-    if (services.size !== initialServices.size) {
-      return true
-    }
-    for (const kind of services) {
-      if (!initialServices.has(kind)) {
-        return true
-      }
-    }
-    return false
-  }, [services, initialServices])
+  const currentServices = sandbox.toSpecs()
+  const servicesChanged = servicesKey(currentServices) !== initialServicesKey
 
   // Apply the draft as a diff: service set (if changed), each staged add, each
   // removed existing repo. Fail-fast on the first error so the dialog stays open
@@ -208,7 +214,7 @@ export function useWorkspaceSettings(): WorkspaceSettings {
         await callRuntimeRpc(target, 'iteration.workspaceUpdate', {
           project,
           workspace,
-          services: [...services]
+          services: sandbox.toSpecs()
         })
       }
       for (const repo of addedRepos) {
@@ -256,7 +262,7 @@ export function useWorkspaceSettings(): WorkspaceSettings {
     mountedRef,
     project,
     repos,
-    services,
+    sandbox,
     servicesChanged,
     target,
     workspace
@@ -277,8 +283,7 @@ export function useWorkspaceSettings(): WorkspaceSettings {
     workspace,
     loading,
     loadError,
-    services,
-    toggleService,
+    sandbox,
     repos,
     removeRepo,
     handleAddRepo,

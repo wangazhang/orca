@@ -5,7 +5,7 @@ import { revealStructuredReposFolders } from './structured-repos-folder-reveal'
 // Projects a structured project into orca's native records, then refreshes the
 // store in the same order App.tsx uses at startup (repos → groups → folder
 // workspaces → worktrees, since worktrees enumerate over repos) and reveals each
-// workspace's default-collapsed "src" folder. Shared by the create wizard's
+// workspace's default-collapsed "repos" folder. Shared by the create wizard's
 // finish step and the import dialog so the sequence lives in exactly one place —
 // a change to the refresh order can never drift between the two flows again.
 //

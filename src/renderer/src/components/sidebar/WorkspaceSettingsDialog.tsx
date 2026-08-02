@@ -10,10 +10,9 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
-import { STRUCTURED_SERVICE_KINDS } from '../../../../shared/structured-project-schema'
 import { translate } from '@/i18n/i18n'
 import { useWorkspaceSettings } from './useWorkspaceSettings'
+import { SandboxServiceSelector } from './SandboxServiceSelector'
 
 const WorkspaceSettingsDialog = React.memo(function WorkspaceSettingsDialog() {
   const {
@@ -21,8 +20,7 @@ const WorkspaceSettingsDialog = React.memo(function WorkspaceSettingsDialog() {
     workspace,
     loading,
     loadError,
-    services,
-    toggleService,
+    sandbox,
     repos,
     removeRepo,
     handleAddRepo,
@@ -68,21 +66,7 @@ const WorkspaceSettingsDialog = React.memo(function WorkspaceSettingsDialog() {
                   'Sandbox services'
                 )}
               </Label>
-              <div className="grid grid-cols-2 gap-2">
-                {STRUCTURED_SERVICE_KINDS.map((kind) => (
-                  <label
-                    key={kind}
-                    className="flex cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <Checkbox
-                      checked={services.has(kind)}
-                      disabled={busy}
-                      onCheckedChange={() => toggleService(kind)}
-                    />
-                    <span className="font-mono">{kind}</span>
-                  </label>
-                ))}
-              </div>
+              <SandboxServiceSelector selection={sandbox} busy={busy} />
             </div>
 
             <div className="space-y-1.5">

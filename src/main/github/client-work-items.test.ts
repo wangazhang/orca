@@ -104,7 +104,7 @@ describe('listWorkItems', () => {
     _resetGhCwdRepoNegativeCache()
   })
 
-  it('stops re-spawning gh for a repo whose cwd resolution already failed with no remotes', async () => {
+  it('returns empty (not an error) and stops re-spawning gh for a non-GitHub repo whose cwd resolution fails', async () => {
     getIssueOwnerRepoMock.mockResolvedValue(null)
     getOwnerRepoMock.mockResolvedValue(null)
     ghExecFileAsyncMock.mockRejectedValue(
@@ -113,11 +113,14 @@ describe('listWorkItems', () => {
       })
     )
 
-    await expect(listWorkItems('/no-remote-repo', 36)).rejects.toThrow('no git remotes found')
+    // Why: a non-GitHub remote has no GitHub work items — this must resolve to
+    // an empty list rather than reject, so the renderer's cross-repo aggregator
+    // doesn't count the repo as failed and drop it from the Tasks list.
+    await expect(listWorkItems('/no-remote-repo', 36)).resolves.toMatchObject({ items: [] })
     // The first refresh pays the two cwd-fallback spawns (issue + pr list).
     expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(2)
 
-    await expect(listWorkItems('/no-remote-repo', 36)).rejects.toThrow('no git remotes found')
+    await expect(listWorkItems('/no-remote-repo', 36)).resolves.toMatchObject({ items: [] })
     // The second refresh is served from the negative cache — zero new spawns.
     expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(2)
   })

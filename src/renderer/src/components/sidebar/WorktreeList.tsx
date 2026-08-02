@@ -5081,8 +5081,8 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
               // legacy cards keep the old depth-based nested row geometry.
               const paddingDepth = nested ? Math.max(0, itemRow.depth - 1) : itemRow.depth
               // Why: structured-project leaf rows (a mounted repo's single
-              // worktree under <workspace>/src/) otherwise nest a full tree
-              // step deeper than their "src" folder header; anchor them to the
+              // worktree under <workspace>/repos/) otherwise nest a full tree
+              // step deeper than their "repos" folder header; anchor them to the
               // compact folder-workspace step so they sit one tidy indent under
               // src. Structured-only — normal grouped rows are unaffected.
               const isStructuredLeaf = isStructuredRepoSectionKey(itemRow.sectionKey)

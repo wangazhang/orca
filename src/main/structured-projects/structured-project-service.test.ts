@@ -12,7 +12,7 @@ import {
   listStructuredProjectsService
 } from './structured-project-service'
 import { readProjectFile } from './structured-project-disk'
-import { srcRepoDir } from './structured-project-layout'
+import { workspaceRepoDir } from './structured-project-layout'
 
 // The service resolves ~/orca/projects via os.homedir(); point HOME at a temp
 // dir so the whole flow runs on real filesystem without touching real data.
@@ -40,11 +40,17 @@ describe('createStructuredProjectService', () => {
   it('writes project.json under ~/orca/projects/<name> by default', () => {
     const summary = createStructuredProjectService({
       name: 'Penguin-go',
-      services: ['mysql', 'redis']
+      services: [
+        { name: 'mysql', kind: 'mysql' },
+        { name: 'redis', kind: 'redis' }
+      ]
     })
     expect(summary.rootPath).toBe(join(projectsDir(), 'Penguin-go'))
     expect(existsSync(join(summary.rootPath, 'project.json'))).toBe(true)
-    expect(summary.services).toEqual(['mysql', 'redis'])
+    expect(summary.services).toEqual([
+      { name: 'mysql', kind: 'mysql' },
+      { name: 'redis', kind: 'redis' }
+    ])
   })
 })
 
@@ -58,7 +64,7 @@ describe('createStructuredWorkspaceService', () => {
     expect(workspace.name).toBe('youho')
     const wsRoot = join(projectsDir(), 'Penguin-go', 'youho')
     expect(existsSync(join(wsRoot, '.yoho', 'workspace.json'))).toBe(true)
-    expect(existsSync(join(wsRoot, 'src'))).toBe(true)
+    expect(existsSync(join(wsRoot, 'repos'))).toBe(true)
   })
 
   it('throws a clear error for an unknown project', async () => {
@@ -71,7 +77,7 @@ describe('createStructuredWorkspaceService', () => {
 describe('listStructuredProjectsService', () => {
   it('lists projects discovered by scanning the projects dir', () => {
     createStructuredProjectService({ name: 'A', services: [] })
-    createStructuredProjectService({ name: 'B', services: ['redis'] })
+    createStructuredProjectService({ name: 'B', services: [{ name: 'redis', kind: 'redis' }] })
     const names = listStructuredProjectsService()
       .map((p) => p.name)
       .sort()
@@ -87,7 +93,10 @@ describe('getStructuredProjectService', () => {
     execFileSync('git', ['-C', source, 'config', 'user.name', 'Orca Test'])
     execFileSync('git', ['-C', source, 'commit', '--allow-empty', '-m', 'init'])
 
-    createStructuredProjectService({ name: 'Penguin-go', services: ['mysql'] })
+    createStructuredProjectService({
+      name: 'Penguin-go',
+      services: [{ name: 'mysql', kind: 'mysql' }]
+    })
     await createStructuredWorkspaceService({ project: 'Penguin-go', workspaceName: 'youho' })
     await addWorkspaceRepoService({
       project: 'Penguin-go',
@@ -99,7 +108,7 @@ describe('getStructuredProjectService', () => {
 
     const detail = getStructuredProjectService('Penguin-go')
     expect(detail.name).toBe('Penguin-go')
-    expect(detail.services).toEqual(['mysql'])
+    expect(detail.services).toEqual([{ name: 'mysql', kind: 'mysql' }])
     expect(detail.workspaces).toHaveLength(1)
     expect(detail.workspaces[0].name).toBe('youho')
     expect(detail.workspaces[0].worktrees.map((w) => w.repoId)).toEqual(['qa-pk'])
@@ -107,7 +116,7 @@ describe('getStructuredProjectService', () => {
 })
 
 describe('addWorkspaceRepoService (real git, full flow)', () => {
-  it('creates project → workspace → mounts a repo as a worktree under src/', async () => {
+  it('creates project → workspace → mounts a repo as a worktree under repos/', async () => {
     const source = join(dir, 'source-repo')
     execFileSync('git', ['init', '-b', 'main', source])
     execFileSync('git', ['-C', source, 'config', 'user.email', 'test@orca.dev'])
@@ -125,7 +134,7 @@ describe('addWorkspaceRepoService (real git, full flow)', () => {
     })
 
     const wsRoot = join(projectsDir(), 'Penguin-go', 'youho')
-    const target = srcRepoDir(wsRoot, 'qa-pk')
+    const target = workspaceRepoDir(wsRoot, 'qa-pk')
     expect(entry.path).toBe(target)
     expect(readFileSync(join(target, '.git'), 'utf8')).toContain('gitdir:')
     const branch = execFileSync('git', ['-C', target, 'rev-parse', '--abbrev-ref', 'HEAD'], {
@@ -195,7 +204,7 @@ describe('addWorkspaceRepoService (real git, full flow)', () => {
       registration: { ensureRepoId: () => 'orca-uuid-1', setWorktreeMeta }
     })
 
-    const target = srcRepoDir(join(projectsDir(), 'Penguin-go', 'youho'), 'qa-pk')
+    const target = workspaceRepoDir(join(projectsDir(), 'Penguin-go', 'youho'), 'qa-pk')
     expect(setWorktreeMeta).toHaveBeenCalledTimes(1)
     const [key, meta] = setWorktreeMeta.mock.calls[0]
     expect(key).toBe(`orca-uuid-1::${target}`)

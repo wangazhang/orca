@@ -1852,7 +1852,11 @@
         "c9ff9b9ec2": "Check official releases",
         "a05992a26b": "The signature check couldn't run — usually because antivirus software blocked it. Retry the download, or get the installer from our official releases.",
         "5194358929": "Hide details",
-        "8bc9e17d8f": "Show details"
+        "8bc9e17d8f": "Show details",
+        "manualInstallTitle": "Manual Install Required",
+        "manualInstallSummary": "This build cannot update itself. Download the new version and replace Orca in Applications.",
+        "manualDownload": "Download update",
+        "manualInstallHint": "This build installs manually: download it, replace Orca in Applications, then reopen. On first launch, right-click the app and choose Open."
       },
       "WorktreeJumpPalette": {
         "ac037cfac2": "移動",
@@ -4815,7 +4819,26 @@
           "notGitRepo": "Git リポジトリではありません",
           "locationLabel": "場所",
           "browse": "参照…",
-          "locationHint": "空欄の場合はデフォルト（~/orca/projects）を使用します。"
+          "locationHint": "空欄の場合はデフォルト（~/orca/projects）を使用します。",
+          "projectReposLabel": "Project repositories",
+          "projectReposHint": "Add a local folder or a Git URL. Workspaces pick the repos they need from this list.",
+          "addUrl": "Add",
+          "browseRepo": "Pick folder…",
+          "repoUrlPlaceholder": "https://…/repo.git",
+          "selectFromProjectTitle": "Select from project repositories",
+          "selectFromProjectHint": "Check the repositories this workspace needs. They mount when you finish.",
+          "repoMountedBadge": "mounted",
+          "configurePrompt": "Select an item on the left to configure.",
+          "sandboxServicesCount": "{{count}} selected",
+          "projectReposCount": "{{count}} repositories added",
+          "noneSelected": "None selected",
+          "addRepoTitle": "Add repository",
+          "addRepoHint": "Choose or drop a local Git folder to add it to the project and mount it in this workspace.",
+          "back": "Back",
+          "continueToSandbox": "Next: sandbox",
+          "sandboxTitle": "Sandbox middleware",
+          "sandboxDescription": "Detected from your repositories. Check what this workspace should run.",
+          "sandboxNoRepos": "No repositories in this project yet, so nothing could be detected. You can still pick middleware manually."
         },
         "CopyWorkspaceDialog": {
           "title": "Copy workspace",
@@ -4870,7 +4893,25 @@
           "rootLabel": "プロジェクトフォルダ",
           "rootPlaceholder": "フォルダを選択…",
           "browse": "参照…",
-          "import": "インポート"
+          "import": "インポート",
+          "done": "Structured project imported"
+        },
+        "SandboxServiceSelector": {
+          "presetsLabel": "Middleware",
+          "detecting": "Detecting from repositories…",
+          "autoDetectedBadge": "auto-detected",
+          "detectedIn": "Found “{{signal}}” in {{repo}}",
+          "customLabel": "Custom middleware",
+          "removeCustom": "Remove",
+          "customNamePlaceholder": "name (e.g. kafka)",
+          "customPortPlaceholder": "port (e.g. 9092)",
+          "customImagePlaceholder": "image (e.g. apache/kafka:3.8.0)",
+          "customCommandPlaceholder": "start command (optional)",
+          "addCustom": "Add custom middleware",
+          "customMissingFields": "Name and image are required.",
+          "customInvalidName": "Use a unique name (letters, digits, - or _) that is not a preset.",
+          "customInvalidPort": "Enter a valid container port.",
+          "customDuplicate": "A service with that name already exists."
         }
       },
       "shared": {
@@ -9305,6 +9346,15 @@
           "howToUseDescription": "Ask an agent working a Linear-linked worktree to read context, post updates, move the ticket, or attach the PR.",
           "terminalTitle": "Linear skill setup",
           "terminalAriaLabel": "Linear skill install terminal"
+        },
+        "license": {
+          "title": "License",
+          "valid": "Licensed through {{value0}}.",
+          "grace": "Expired on {{value0}}. Orca is running on its grace period — please renew.",
+          "expired": "Expired on {{value0}}.",
+          "mismatch": "This license belongs to a different computer.",
+          "invalid": "The stored license could not be verified.",
+          "missing": "No license has been activated yet."
         }
       },
       "right": {
@@ -13313,6 +13363,29 @@
           "undo": "元に戻す",
           "widthOption": "{{value0}} px"
         }
+      },
+      "license": {
+        "activateFailed": "Could not activate. Please try again.",
+        "tokenLabel": "License key",
+        "activating": "Activating...",
+        "activate": "Activate",
+        "machineIdHint": "Send this machine ID when requesting a license bound to this computer.",
+        "copied": "Copied",
+        "copy": "Copy",
+        "errorMachineMismatch": "This license is bound to a different computer. Request one for this machine ID.",
+        "errorExpired": "This license has already expired. Please request a renewal.",
+        "errorInvalid": "That license key is not valid. Check that it was copied in full.",
+        "gateTitle": "License required",
+        "gateExpiredTitle": "Your license has expired",
+        "gateMismatchTitle": "License issued for another computer",
+        "gateInvalidTitle": "License could not be verified",
+        "gateMissingTitle": "Activate Orca",
+        "gateExpiredBody": "The grace period has ended. Enter a renewed license key to continue.",
+        "gateMismatchBody": "This license is bound to a different machine ID. Request a license for the ID below.",
+        "gateInvalidBody": "The stored license key could not be verified. Re-entering the same key will not help — please request a new one.",
+        "gateMissingBody": "Enter the license key you were given to start using Orca.",
+        "bannerGrace": "Your license expired. Orca keeps working for {{value0}} more day(s) — please renew.",
+        "bannerExpiring": "Your license expires in {{value0}} day(s)."
       }
     },
     "i18n": {

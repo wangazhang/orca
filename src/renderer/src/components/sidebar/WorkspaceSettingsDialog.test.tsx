@@ -87,7 +87,7 @@ function defaultRpc(_target: unknown, method: string): Promise<unknown> {
         workspaces: [
           {
             name: 'it1',
-            services: [{ kind: 'mysql', hostPort: 3306 }],
+            services: [{ name: 'mysql', kind: 'mysql', hostPort: 3306 }],
             worktrees: [{ repoId: 'repo-a', path: '/a', branch: 'it1' }]
           }
         ]
@@ -169,9 +169,10 @@ describe('WorkspaceSettingsDialog', () => {
       [{ kind: 'local' }, 'iteration.get', { project: 'penguin-x' }]
     ])
     expect(container.textContent).toContain('repo-a')
-    // mysql pre-checked, the rest unchecked.
+    // mysql pre-checked, the rest unchecked. One checkbox per preset middleware
+    // kind (mysql, redis, postgres, mongo, rocketmq, kafka, elasticsearch, nacos).
     const checkboxes = container.querySelectorAll('button[role="checkbox"]')
-    expect(checkboxes.length).toBe(4)
+    expect(checkboxes.length).toBe(8)
     expect(checkboxes[0].getAttribute('aria-checked')).toBe('true')
     expect(checkboxes[1].getAttribute('aria-checked')).toBe('false')
   })
@@ -194,9 +195,13 @@ describe('WorkspaceSettingsDialog', () => {
 
     const updateCall = methodCalls('iteration.workspaceUpdate')[0]
     expect(updateCall).toBeTruthy()
-    const updateArgs = updateCall[2] as { project: string; workspace: string; services: string[] }
+    const updateArgs = updateCall[2] as {
+      project: string
+      workspace: string
+      services: { name: string }[]
+    }
     expect(updateArgs.project).toBe('penguin-x')
-    expect([...updateArgs.services].sort()).toEqual(['mysql', 'redis'])
+    expect(updateArgs.services.map((s) => s.name).sort()).toEqual(['mysql', 'redis'])
     expect(callRuntimeRpcMock).toHaveBeenCalledWith(
       { kind: 'local' },
       'iteration.workspaceAddRepo',

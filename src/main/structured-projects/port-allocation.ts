@@ -5,7 +5,7 @@
 // an optional live listen() probe on top for real allocation.
 import { createServer } from 'node:net'
 import type {
-  StructuredServiceKind,
+  StructuredServiceSpec,
   StructuredWorkspaceService
 } from '../../shared/structured-project-schema'
 
@@ -56,9 +56,9 @@ export function isPortAvailable(port: number, host: string = BIND_HOST): Promise
 
 // Assigns one host port per service, skipping ports in `reserved` and — when
 // `probe` is on (default) — any port a live listen() shows as busy. Returns the
-// workspace.json services shape directly.
+// workspace.json services shape directly (each spec plus its allocated port).
 export async function assignServicePorts(
-  services: readonly StructuredServiceKind[],
+  services: readonly StructuredServiceSpec[],
   options?: {
     reserved?: Iterable<number>
     rangeStart?: number
@@ -73,7 +73,7 @@ export async function assignServicePorts(
   const assigned: StructuredWorkspaceService[] = []
 
   let cursor = rangeStart
-  for (const kind of services) {
+  for (const service of services) {
     let chosen = -1
     for (; cursor <= rangeEnd; cursor++) {
       if (used.has(cursor)) {
@@ -90,10 +90,10 @@ export async function assignServicePorts(
     }
     if (chosen < 0) {
       throw new Error(
-        `Cannot allocate a host port for "${kind}" in range ${rangeStart}-${rangeEnd}`
+        `Cannot allocate a host port for "${service.name}" in range ${rangeStart}-${rangeEnd}`
       )
     }
-    assigned.push({ kind, hostPort: chosen })
+    assigned.push({ ...service, hostPort: chosen })
   }
   return assigned
 }

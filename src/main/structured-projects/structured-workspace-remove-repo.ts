@@ -7,7 +7,7 @@
 import { rmSync } from 'node:fs'
 import { removeWorktree } from '../git/worktree'
 import { readWorkspaceFile, writeWorkspaceFile } from './structured-project-disk'
-import { srcRepoDir, workspaceDir } from './structured-project-layout'
+import { workspaceRepoDir, workspaceDir } from './structured-project-layout'
 import { resolveProject } from './structured-project-service'
 
 export async function removeStructuredWorkspaceRepoService(params: {
@@ -23,7 +23,7 @@ export async function removeStructuredWorkspaceRepoService(params: {
     throw new Error(`Workspace not found: ${params.workspace} (${read.error})`)
   }
 
-  const worktreePath = srcRepoDir(wsDir, params.repoId)
+  const worktreePath = workspaceRepoDir(wsDir, params.repoId)
   // The member carries the source repo path `git worktree remove` must run
   // against. It may be absent (inconsistent disk) — then we can only best-effort
   // remove the working directory.

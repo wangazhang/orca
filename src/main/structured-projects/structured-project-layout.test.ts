@@ -7,8 +7,8 @@ import {
   docDir,
   devopsDir,
   projectJsonPath,
-  srcDir,
-  srcRepoDir,
+  workspaceReposDir,
+  workspaceRepoDir,
   workspaceDir,
   workspaceJsonPath,
   workspaceMetaDir
@@ -34,11 +34,11 @@ describe('structured project layout', () => {
   it('exposes doc/ devops/ src/ as workspace children', () => {
     expect(docDir(ws)).toBe(join(ws, 'doc'))
     expect(devopsDir(ws)).toBe(join(ws, 'devops'))
-    expect(srcDir(ws)).toBe(join(ws, 'src'))
+    expect(workspaceReposDir(ws)).toBe(join(ws, 'repos'))
   })
 
   it('places each member repo under src/<repoId>', () => {
-    expect(srcRepoDir(ws, 'qa-pk')).toBe(join(ws, 'src', 'qa-pk'))
+    expect(workspaceRepoDir(ws, 'qa-pk')).toBe(join(ws, 'repos', 'qa-pk'))
   })
 
   it('places compose, env, and per-service data under devops/', () => {

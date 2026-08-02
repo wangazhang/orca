@@ -1852,7 +1852,11 @@
         "c9ff9b9ec2": "Check official releases",
         "a05992a26b": "The signature check couldn't run — usually because antivirus software blocked it. Retry the download, or get the installer from our official releases.",
         "5194358929": "Hide details",
-        "8bc9e17d8f": "Show details"
+        "8bc9e17d8f": "Show details",
+        "manualInstallTitle": "需要手动安装",
+        "manualInstallSummary": "此版本无法自动更新。请下载新版本并替换「应用程序」中的 Orca。",
+        "manualDownload": "下载更新",
+        "manualInstallHint": "此版本需手动安装：下载后替换「应用程序」中的 Orca，再重新打开。首次启动请右键点按应用并选择「打开」。"
       },
       "WorktreeJumpPalette": {
         "ac037cfac2": "手机",
@@ -4406,8 +4410,8 @@
                   "sshBrowseTitle": "在 SSH 主机上打开项目",
                   "sshBrowseDescription": "此 SSH 主机上的现有 Git 仓库或文件夹",
                   "runtimeBrowseDescription": "此主机上的现有 Git 仓库或文件夹",
-                  "structuredIterationTitle": "结构化迭代",
-                  "structuredIterationDescription": "含文档、隔离沙箱与多个仓库的迭代工作根"
+                  "structuredIterationTitle": "多仓项目",
+                  "structuredIterationDescription": "含文档、隔离沙箱与多个仓库的工作根"
                 }
               }
             }
@@ -4484,7 +4488,7 @@
           "skippedBatchFolders": "已跳过部分文件夹",
           "skippedBatchFoldersDescription": "请单独添加已跳过的文件夹，以便逐个查看或确认。",
           "repoAlreadyAdded": "该仓库已在 Orca 中",
-          "repoExistsInProject": "位于结构化工程「{{value0}}」中",
+          "repoExistsInProject": "位于多仓项目「{{value0}}」中",
           "locateRepo": "定位"
         },
         "useAddRepoNestedImportFlow": {
@@ -4788,13 +4792,18 @@
           "sshPersistenceDefault": "此主机上的远程终端会保持运行，直到你结束它们或重置中继。"
         },
         "NewStructuredIterationDialog": {
-          "finishTitle": "结构化迭代已就绪",
-          "projectTitle": "新建结构化迭代",
+          "finishTitle": "多仓项目已就绪",
+          "projectTitle": "新建多仓项目",
           "workspaceTitle": "创建首个工作空间",
           "reposTitle": "添加仓库",
           "projectDescription": "一个物理项目根：含文档、隔离沙箱与多个仓库。",
           "workspaceDescription": "工作空间即一次迭代：拥有独立的沙箱端口与仓库 worktree。",
           "reposDescription": "把本地 Git 仓库以 worktree 挂到工作空间分支上。",
+          "back": "上一步",
+          "continueToSandbox": "下一步：沙箱",
+          "sandboxTitle": "沙箱中间件",
+          "sandboxDescription": "已根据你的仓库自动识别，确认这个工作空间需要运行哪些中间件。",
+          "sandboxNoRepos": "项目里还没有仓库，因此没有可识别的内容。你仍然可以手动勾选中间件。",
           "nameLabel": "项目名称",
           "servicesLabel": "沙箱服务",
           "workspaceNameLabel": "工作空间名称",
@@ -4815,7 +4824,21 @@
           "notGitRepo": "不是 Git 仓库",
           "locationLabel": "位置",
           "browse": "浏览…",
-          "locationHint": "留空则使用默认位置（~/orca/projects）。"
+          "locationHint": "留空则使用默认位置（~/orca/projects）。",
+          "projectReposLabel": "项目仓库",
+          "projectReposHint": "添加本地文件夹或 Git 地址。工作空间从此列表中选取所需仓库。",
+          "addUrl": "添加",
+          "browseRepo": "选择文件夹…",
+          "repoUrlPlaceholder": "https://…/repo.git",
+          "selectFromProjectTitle": "从项目仓库中选择",
+          "selectFromProjectHint": "勾选此工作空间需要的仓库，完成时挂载。",
+          "repoMountedBadge": "已挂载",
+          "configurePrompt": "从左侧选择一项进行配置。",
+          "sandboxServicesCount": "已选 {{count}} 项",
+          "projectReposCount": "已添加 {{count}} 个仓库",
+          "noneSelected": "未选择",
+          "addRepoTitle": "新增仓库",
+          "addRepoHint": "选择或拖入一个本地 Git 目录，将其加入项目并在本工作空间挂载。"
         },
         "CopyWorkspaceDialog": {
           "title": "Copy workspace",
@@ -4838,6 +4861,23 @@
           "notGitFolder": "That folder is not a Git repository.",
           "savedTitle": "Workspace updated"
         },
+        "SandboxServiceSelector": {
+          "presetsLabel": "中间件",
+          "detecting": "正在从仓库识别…",
+          "autoDetectedBadge": "自动识别",
+          "detectedIn": "在 {{repo}} 中检测到「{{signal}}」",
+          "customLabel": "自定义中间件",
+          "removeCustom": "移除",
+          "customNamePlaceholder": "名称（如 kafka）",
+          "customPortPlaceholder": "端口（如 9092）",
+          "customImagePlaceholder": "镜像（如 apache/kafka:3.8.0）",
+          "customCommandPlaceholder": "启动命令（可选）",
+          "addCustom": "添加自定义中间件",
+          "customMissingFields": "名称和镜像为必填项。",
+          "customInvalidName": "请使用唯一名称（字母、数字、- 或 _），且不能与预置同名。",
+          "customInvalidPort": "请输入有效的容器端口。",
+          "customDuplicate": "已存在同名的中间件。"
+        },
         "ForgetSshWorkspaceDialog": {
           "reconnectFailed": "重新连接失败",
           "forgetBody": "仅从 Orca 中移除此工作区。文件、Git 工作树和 {{host}} 上的分支保持不变。",
@@ -4853,24 +4893,25 @@
           "description": "你要添加哪种项目？",
           "normalTitle": "仓库型项目",
           "normalDescription": "打开、克隆或新建单个 Git 仓库或文件夹",
-          "structuredTitle": "结构化项目",
+          "structuredTitle": "多仓项目",
           "structuredDescription": "多个仓库，含文档和隔离沙箱"
         },
         "AddRepoStructuredStep": {
-          "title": "结构化项目",
+          "title": "多仓项目",
           "description": "一个包含文档、隔离沙箱和多个仓库的项目根目录。",
-          "newTitle": "新建结构化项目",
+          "newTitle": "新建多仓项目",
           "newDescription": "搭建全新的项目根目录及其首个工作空间",
-          "importTitle": "导入结构化项目",
+          "importTitle": "导入多仓项目",
           "importDescription": "注册一个已有的项目文件夹（含 project.json）"
         },
         "StructuredImportDialog": {
-          "title": "导入结构化项目",
+          "title": "导入多仓项目",
           "description": "选择一个已有的项目文件夹（其中包含 project.json）。",
           "rootLabel": "项目文件夹",
           "rootPlaceholder": "选择一个文件夹…",
           "browse": "浏览…",
-          "import": "导入"
+          "import": "导入",
+          "done": "Structured project imported"
         }
       },
       "shared": {
@@ -9305,6 +9346,15 @@
           "howToUseDescription": "Ask an agent working a Linear-linked worktree to read context, post updates, move the ticket, or attach the PR.",
           "terminalTitle": "Linear skill setup",
           "terminalAriaLabel": "Linear skill install terminal"
+        },
+        "license": {
+          "title": "许可证",
+          "valid": "许可证有效期至 {{value0}}。",
+          "grace": "已于 {{value0}} 到期。Orca 正处于宽限期，请尽快续期。",
+          "expired": "已于 {{value0}} 到期。",
+          "mismatch": "此许可证属于另一台电脑。",
+          "invalid": "无法验证已保存的许可证。",
+          "missing": "尚未激活任何许可证。"
         }
       },
       "right": {
@@ -13313,6 +13363,29 @@
           "undo": "撤销",
           "widthOption": "{{value0}} px"
         }
+      },
+      "license": {
+        "activateFailed": "激活失败，请重试。",
+        "tokenLabel": "许可证密钥",
+        "activating": "正在激活…",
+        "activate": "激活",
+        "machineIdHint": "申请绑定本机的许可证时，请提供以下机器 ID。",
+        "copied": "已复制",
+        "copy": "复制",
+        "errorMachineMismatch": "此许可证已绑定到另一台电脑。请用下方机器 ID 重新申请。",
+        "errorExpired": "此许可证已过期，请申请续期。",
+        "errorInvalid": "许可证密钥无效，请检查是否完整复制。",
+        "gateTitle": "需要许可证",
+        "gateExpiredTitle": "许可证已过期",
+        "gateMismatchTitle": "许可证签发给了另一台电脑",
+        "gateInvalidTitle": "无法验证许可证",
+        "gateMissingTitle": "激活 Orca",
+        "gateExpiredBody": "宽限期已结束。请输入续期后的许可证密钥以继续使用。",
+        "gateMismatchBody": "此许可证绑定的是另一个机器 ID。请用下方的 ID 重新申请许可证。",
+        "gateInvalidBody": "无法验证已保存的许可证密钥。重新输入同一密钥无济于事，请重新申请。",
+        "gateMissingBody": "请输入你收到的许可证密钥以开始使用 Orca。",
+        "bannerGrace": "许可证已过期。Orca 还可继续使用 {{value0}} 天，请尽快续期。",
+        "bannerExpiring": "许可证将在 {{value0}} 天后到期。"
       }
     },
     "i18n": {

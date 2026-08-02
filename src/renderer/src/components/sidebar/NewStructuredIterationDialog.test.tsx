@@ -55,7 +55,10 @@ vi.mock('@/runtime/runtime-rpc-client', () => ({
   getActiveRuntimeTarget: () => ({ kind: 'local' as const })
 }))
 vi.mock('sonner', () => ({ toast: { success: toastSuccessMock } }))
-vi.mock('@/i18n/i18n', () => ({ translate: (_key: string, fallback: string) => fallback }))
+vi.mock('@/i18n/i18n', () => ({
+  translate: (_key: string, fallback: string, params?: Record<string, unknown>) =>
+    params ? fallback.replace(/\{\{(\w+)\}\}/g, (_m, name) => String(params[name] ?? '')) : fallback
+}))
 // Mock the radix-backed primitives to plain passthroughs so the wizard logic can
 // be tested in happy-dom without portal/focus-trap machinery.
 vi.mock('@/components/ui/dialog', () => ({
@@ -191,6 +194,12 @@ async function dropFolder(path: string): Promise<void> {
   })
 }
 
+// The repos step now continues to the sandbox step, where Done finishes the run.
+async function finishFromReposStep(): Promise<void> {
+  await click(button('Next: sandbox'))
+  await click(button('Done'))
+}
+
 describe('NewStructuredIterationDialog', () => {
   it('drives create → workspaceCreate → workspaceAddRepo → materialize across the three steps', async () => {
     await render()
@@ -199,6 +208,9 @@ describe('NewStructuredIterationDialog', () => {
     const nameInput = container.querySelector<HTMLInputElement>('#structured-iteration-name')
     expect(nameInput).not.toBeNull()
     await setInputValue(nameInput as HTMLInputElement, 'Demo')
+    // The sandbox services now live in a right-hand detail panel that opens when
+    // the "Sandbox services" entry is clicked; open it, then check one service.
+    await click(button('Sandbox services'))
     await click(
       container.querySelector<HTMLButtonElement>('button[role="checkbox"]') as HTMLElement
     )
@@ -236,7 +248,7 @@ describe('NewStructuredIterationDialog', () => {
     expect(container.textContent).toContain('qa-pk')
 
     // Finish — the queued repo mounts on Done, then materialize + refresh + close
-    await click(button('Done'))
+    await finishFromReposStep()
     expect(callRuntimeRpcMock).toHaveBeenCalledWith(
       { kind: 'local' },
       'iteration.workspaceAddRepo',
@@ -249,6 +261,40 @@ describe('NewStructuredIterationDialog', () => {
     expect(fetchWorktreesMock).toHaveBeenCalled()
     expect(toastSuccessMock).toHaveBeenCalled()
     expect(closeModalMock).toHaveBeenCalled()
+  })
+
+  it('adds custom middleware on the project step and includes it in iteration.create', async () => {
+    await render()
+    const nameInput = container.querySelector<HTMLInputElement>('#structured-iteration-name')
+    await setInputValue(nameInput as HTMLInputElement, 'Demo')
+    await click(button('Sandbox services'))
+
+    const byPlaceholder = (needle: string): HTMLInputElement => {
+      const found = Array.from(container.querySelectorAll('input')).find((el) =>
+        el.getAttribute('placeholder')?.includes(needle)
+      )
+      if (!found) {
+        throw new Error(`input not found by placeholder: ${needle}`)
+      }
+      return found
+    }
+    await setInputValue(byPlaceholder('name'), 'kafka2')
+    await setInputValue(byPlaceholder('port'), '9092')
+    await setInputValue(byPlaceholder('image'), 'apache/kafka:3.8.0')
+    await click(button('Add custom middleware'))
+
+    await click(button('Create project only'))
+
+    const createArgs = methodCalls('iteration.create')[0][2] as {
+      services: { name: string; kind: string | null; image?: string; containerPort?: number }[]
+    }
+    expect(createArgs.services).toContainEqual({
+      name: 'kafka2',
+      kind: null,
+      image: 'apache/kafka:3.8.0',
+      containerPort: 9092,
+      command: undefined
+    })
   })
 
   it('creates the project only — materialize + close without a workspace', async () => {
@@ -305,7 +351,7 @@ describe('NewStructuredIterationDialog', () => {
     })
     expect(methodCalls('iteration.workspaceAddRepo').length).toBe(0)
 
-    await click(button('Done'))
+    await finishFromReposStep()
     expect(callRuntimeRpcMock).toHaveBeenCalledWith(
       { kind: 'local' },
       'iteration.workspaceAddRepo',
@@ -326,7 +372,7 @@ describe('NewStructuredIterationDialog', () => {
     await click(button('Choose a local Git folder'))
     expect(container.textContent).toContain('Not a Git repository')
     // Rejected → nothing queued, so Done mounts nothing.
-    await click(button('Done'))
+    await finishFromReposStep()
     expect(methodCalls('iteration.workspaceAddRepo').length).toBe(0)
   })
 
@@ -340,7 +386,7 @@ describe('NewStructuredIterationDialog', () => {
     expect(container.textContent).toContain('dropped-repo')
     expect(methodCalls('iteration.workspaceAddRepo').length).toBe(0)
 
-    await click(button('Done'))
+    await finishFromReposStep()
     expect(callRuntimeRpcMock).toHaveBeenCalledWith(
       { kind: 'local' },
       'iteration.workspaceAddRepo',
@@ -360,13 +406,78 @@ describe('NewStructuredIterationDialog', () => {
     await click(removeButton as HTMLElement)
     expect(container.textContent).not.toContain('oops')
 
-    await click(button('Done'))
+    await finishFromReposStep()
     expect(methodCalls('iteration.workspaceAddRepo').length).toBe(0)
   })
 
+  it('steps Back from the workspace step and going forward again does not re-create the project', async () => {
+    await render()
+    const nameInput = container.querySelector<HTMLInputElement>('#structured-iteration-name')
+    await setInputValue(nameInput as HTMLInputElement, 'Demo')
+    await click(button('Create & add workspace'))
+    expect(methodCalls('iteration.create').length).toBe(1)
+
+    // Back returns to the project step with its fields still editable.
+    await click(button('Back'))
+    expect(container.querySelector('#structured-iteration-name')).not.toBeNull()
+
+    // Forward again advances without a second iteration.create.
+    await click(button('Create & add workspace'))
+    expect(methodCalls('iteration.create').length).toBe(1)
+    expect(container.querySelector('#structured-workspace-name')).not.toBeNull()
+  })
+
+  it('has no Back on the entry step of a mid-flow re-entry', async () => {
+    await openWith({ project: 'penguin-x', workspace: 'it2', startAt: 'repos' })
+    const backButton = Array.from(container.querySelectorAll('button')).find((entry) =>
+      entry.textContent?.includes('Back')
+    )
+    expect(backButton).toBeUndefined()
+  })
+
+  it('detects middleware from the project repos on the sandbox step and pre-checks it', async () => {
+    callRuntimeRpcMock.mockImplementation((_target: unknown, method: string) => {
+      if (method === 'iteration.get') {
+        return Promise.resolve({
+          project: {
+            members: [{ repoId: 'mrs', source: '/src/mrs' }],
+            workspaces: [{ name: 'it2', worktrees: [] }]
+          }
+        })
+      }
+      if (method === 'iteration.detectServices') {
+        return Promise.resolve({
+          detected: [
+            {
+              kind: 'postgres',
+              evidence: [{ path: '/src/mrs', file: 'pom.xml', signal: 'jdbc:postgresql' }]
+            }
+          ]
+        })
+      }
+      return Promise.resolve({})
+    })
+
+    await openWith({ project: 'penguin-x', workspace: 'it2', startAt: 'repos' })
+    await click(button('Next: sandbox'))
+    await act(async () => {})
+
+    // Scanned the project's member repo paths…
+    expect(callRuntimeRpcMock).toHaveBeenCalledWith({ kind: 'local' }, 'iteration.detectServices', {
+      paths: ['/src/mrs']
+    })
+    // …and surfaced the evidence so the pre-check is explained.
+    expect(container.textContent).toContain('jdbc:postgresql')
+
+    // Finishing applies the detected selection to the workspace sandbox.
+    await click(button('Done'))
+    const updateCall = methodCalls('iteration.workspaceUpdate')[0]
+    expect(updateCall).toBeTruthy()
+    const args = updateCall[2] as { services: { name: string }[] }
+    expect(args.services.map((s) => s.name)).toContain('postgres')
+  })
+
   it('shows the workspace’s already-mounted repos when re-entering the repos step', async () => {
-    // iteration.get is the disk source of truth for what is already mounted; the
-    // repos step pulls it on entry so existing worktrees render before any add.
     callRuntimeRpcMock.mockImplementation((_target: unknown, method: string, params: unknown) => {
       if (method === 'iteration.get') {
         return Promise.resolve({

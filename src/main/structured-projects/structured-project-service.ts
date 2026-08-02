@@ -26,7 +26,7 @@ import { mountRepoIntoWorkspace } from './structured-workspace-repo-mount'
 import type {
   StructuredProjectFile,
   StructuredProjectMember,
-  StructuredServiceKind,
+  StructuredServiceSpec,
   StructuredWorkspaceFile,
   StructuredWorkspaceService,
   StructuredWorkspaceWorktree
@@ -36,7 +36,7 @@ import type { WorktreeMeta } from '../../shared/types'
 export type StructuredProjectSummary = {
   name: string
   rootPath: string
-  services: StructuredServiceKind[]
+  services: StructuredServiceSpec[]
   memberCount: number
 }
 
@@ -63,7 +63,7 @@ export function resolveProject(idOrName: string): {
 
 export function createStructuredProjectService(params: {
   name: string
-  services: StructuredServiceKind[]
+  services: StructuredServiceSpec[]
   rootPath?: string
   parentDir?: string
 }): StructuredProjectSummary {
@@ -175,7 +175,10 @@ export type StructuredWorkspaceDetail = {
 export type StructuredProjectDetail = {
   name: string
   rootPath: string
-  services: StructuredServiceKind[]
+  services: StructuredServiceSpec[]
+  // The project's full repo roster (project.json members). A workspace mounts a
+  // chosen subset of these; the repos step reads it to render a checklist.
+  members: StructuredProjectMember[]
   workspaces: StructuredWorkspaceDetail[]
 }
 
@@ -189,7 +192,13 @@ export function getStructuredProjectService(idOrName: string): StructuredProject
     services: ws.workspace.services,
     worktrees: ws.workspace.worktrees
   }))
-  return { name: project.name, rootPath, services: project.services, workspaces }
+  return {
+    name: project.name,
+    rootPath,
+    services: project.services,
+    members: project.members,
+    workspaces
+  }
 }
 
 export type StructuredWorkspaceMaterializationView = {

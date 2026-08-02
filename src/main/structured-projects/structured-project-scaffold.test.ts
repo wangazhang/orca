@@ -4,7 +4,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createStructuredProject, createStructuredWorkspace } from './structured-project-scaffold'
 import { readProjectFile, readWorkspaceFile } from './structured-project-disk'
-import { devopsComposePath, devopsDataDir, docDir, srcDir } from './structured-project-layout'
+import {
+  devopsComposePath,
+  devopsDataDir,
+  docDir,
+  workspaceReposDir
+} from './structured-project-layout'
 
 const portOptions = { probe: false as const, rangeStart: 30000, rangeEnd: 30100 }
 let dir: string
@@ -19,7 +24,11 @@ afterEach(() => {
 describe('createStructuredProject', () => {
   it('creates the root and a valid project.json with no members', () => {
     const root = join(dir, 'P')
-    const created = createStructuredProject({ name: 'P', rootPath: root, services: ['mysql'] })
+    const created = createStructuredProject({
+      name: 'P',
+      rootPath: root,
+      services: [{ name: 'mysql', kind: 'mysql' }]
+    })
     expect(created.id).toMatch(/[0-9a-f-]{36}/)
     const read = readProjectFile(root)
     expect(read.ok && read.value.members).toEqual([])
@@ -34,11 +43,14 @@ describe('createStructuredWorkspace', () => {
       rootPath: root,
       projectName: 'P',
       workspaceName: 'w1',
-      services: ['mysql', 'redis'],
+      services: [
+        { name: 'mysql', kind: 'mysql' },
+        { name: 'redis', kind: 'redis' }
+      ],
       portOptions
     })
     expect(existsSync(docDir(wsDir))).toBe(true)
-    expect(existsSync(srcDir(wsDir))).toBe(true)
+    expect(existsSync(workspaceReposDir(wsDir))).toBe(true)
     expect(existsSync(devopsDataDir(wsDir, 'mysql'))).toBe(true)
     expect(readFileSync(devopsComposePath(wsDir), 'utf8')).toContain('mysql:8')
     expect(workspace.services).toHaveLength(2)

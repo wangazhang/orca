@@ -9,6 +9,10 @@ import {
 import { updateStructuredWorkspaceServicesService } from './structured-workspace-update'
 import { readWorkspaceFile } from './structured-project-disk'
 import { devopsComposePath, devopsEnvPath, workspaceDir } from './structured-project-layout'
+import type { StructuredServiceKind } from '../../shared/structured-project-schema'
+
+// Preset service specs (name === kind) for the create/update calls below.
+const svc = (...kinds: StructuredServiceKind[]) => kinds.map((kind) => ({ name: kind, kind }))
 
 // The service resolves ~/orca/projects via os.homedir(); point HOME at a temp
 // dir so the whole flow runs on real filesystem without touching real data.
@@ -36,7 +40,7 @@ const wsDirFor = (project: string, workspace: string) =>
 
 describe('updateStructuredWorkspaceServicesService', () => {
   it('adds a service, keeping the existing service’s already-allocated port', async () => {
-    createStructuredProjectService({ name: 'P', services: ['redis'] })
+    createStructuredProjectService({ name: 'P', services: svc('redis') })
     await createStructuredWorkspaceService({ project: 'P', workspaceName: 'w1' })
     const before = readWorkspaceFile(wsDirFor('P', 'w1'))
     const redisPort = before.ok
@@ -46,7 +50,7 @@ describe('updateStructuredWorkspaceServicesService', () => {
     const updated = await updateStructuredWorkspaceServicesService({
       project: 'P',
       workspace: 'w1',
-      services: ['redis', 'mysql']
+      services: svc('redis', 'mysql')
     })
 
     expect(updated.services.map((s) => s.kind)).toEqual(['redis', 'mysql'])
@@ -70,13 +74,13 @@ describe('updateStructuredWorkspaceServicesService', () => {
   })
 
   it('removes a service, dropping it from compose/.env and workspace.json', async () => {
-    createStructuredProjectService({ name: 'P', services: ['redis', 'mysql'] })
+    createStructuredProjectService({ name: 'P', services: svc('redis', 'mysql') })
     await createStructuredWorkspaceService({ project: 'P', workspaceName: 'w1' })
 
     const updated = await updateStructuredWorkspaceServicesService({
       project: 'P',
       workspace: 'w1',
-      services: ['mysql']
+      services: svc('mysql')
     })
 
     expect(updated.services.map((s) => s.kind)).toEqual(['mysql'])
@@ -91,7 +95,7 @@ describe('updateStructuredWorkspaceServicesService', () => {
   })
 
   it('supports clearing all services', async () => {
-    createStructuredProjectService({ name: 'P', services: ['redis'] })
+    createStructuredProjectService({ name: 'P', services: svc('redis') })
     await createStructuredWorkspaceService({ project: 'P', workspaceName: 'w1' })
 
     const updated = await updateStructuredWorkspaceServicesService({

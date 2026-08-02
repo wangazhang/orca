@@ -6,11 +6,14 @@ import { basename } from 'node:path'
 import { defineMethod, type RpcMethod } from '../core'
 import { isGitRepo } from '../../../git/repo'
 import {
+  IterationAddProjectRepo,
   IterationCheckGitRepo,
   IterationCreate,
   IterationDelete,
+  IterationDetectServices,
   IterationGet,
   IterationImport,
+  IterationRemoveProjectRepo,
   IterationWorkspaceAddRepo,
   IterationWorkspaceCopy,
   IterationWorkspaceCreate,
@@ -23,12 +26,21 @@ import {
   createStructuredWorkspaceService,
   deleteStructuredProjectService,
   getStructuredProjectService,
-  listStructuredProjectsService
+  listStructuredProjectsService,
+  resolveProject
 } from '../../../structured-projects/structured-project-service'
 import { copyStructuredWorkspaceService } from '../../../structured-projects/structured-workspace-copy'
 import { importStructuredProjectService } from '../../../structured-projects/structured-project-import'
 import { updateStructuredWorkspaceServicesService } from '../../../structured-projects/structured-workspace-update'
 import { removeStructuredWorkspaceRepoService } from '../../../structured-projects/structured-workspace-remove-repo'
+import {
+  addProjectMemberService,
+  deriveMemberRepoId,
+  looksLikeGitUrl,
+  removeProjectMemberService
+} from '../../../structured-projects/structured-project-member'
+import { reposDir } from '../../../structured-projects/structured-project-layout'
+import { detectServicesInPaths } from '../../../structured-projects/structured-project-detect-services'
 import {
   materializeAllStructuredProjects,
   materializeStructuredProject
@@ -88,11 +100,50 @@ export const ITERATION_RUNTIME_METHODS: RpcMethod[] = [
     }
   }),
   defineMethod({
+    name: 'iteration.addProjectRepo',
+    params: IterationAddProjectRepo,
+    handler: async (params, { runtime }) => {
+      // Git-URL members are cloned into the project's repos/ dir first, then the
+      // resolved local path is what we record as the member source. Local-path
+      // sources are recorded as-is.
+      let source = params.source
+      let repoId = params.repoId
+      if (looksLikeGitUrl(params.source)) {
+        const { rootPath } = resolveProject(params.project)
+        const repo = await runtime.cloneRepo(params.source, reposDir(rootPath))
+        source = repo.path
+        repoId = repoId ?? deriveMemberRepoId(params.source)
+      }
+      const member = addProjectMemberService({
+        project: params.project,
+        source,
+        repoId,
+        defaultBranch: params.defaultBranch
+      })
+      return { member }
+    }
+  }),
+  defineMethod({
+    name: 'iteration.removeProjectRepo',
+    params: IterationRemoveProjectRepo,
+    handler: (params) => {
+      removeProjectMemberService({ project: params.project, repoId: params.repoId })
+      return { ok: true }
+    }
+  }),
+  defineMethod({
     name: 'iteration.checkGitRepo',
     params: IterationCheckGitRepo,
     handler: (params) => ({
       isGitRepo: isGitRepo(params.path),
       repoName: basename(params.path)
+    })
+  }),
+  defineMethod({
+    name: 'iteration.detectServices',
+    params: IterationDetectServices,
+    handler: async (params) => ({
+      detected: await detectServicesInPaths(params.paths)
     })
   }),
   defineMethod({

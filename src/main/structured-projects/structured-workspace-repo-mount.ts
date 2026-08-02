@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import type { WorktreeMeta } from '../../shared/types'
 import type { StructuredWorkspaceWorktree } from '../../shared/structured-project-schema'
 import { readWorkspaceFile, writeWorkspaceFile } from './structured-project-disk'
-import { srcRepoDir } from './structured-project-layout'
+import { workspaceRepoDir } from './structured-project-layout'
 
 export type WorktreeMountDeps = {
   // Runs `git worktree add <target> -b <branch> [baseBranch]` — a subset of
@@ -52,7 +52,7 @@ export async function mountRepoIntoWorkspace(
   deps: WorktreeMountDeps,
   params: MountRepoParams
 ): Promise<StructuredWorkspaceWorktree> {
-  const targetPath = srcRepoDir(params.wsDir, params.repoId)
+  const targetPath = workspaceRepoDir(params.wsDir, params.repoId)
   await deps.addWorktree(params.source, targetPath, params.branch, params.defaultBranch)
 
   // Optional: register with Orca so the worktree is orca-managed.

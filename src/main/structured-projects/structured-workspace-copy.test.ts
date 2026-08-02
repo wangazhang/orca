@@ -10,7 +10,7 @@ import {
 } from './structured-project-service'
 import { copyStructuredWorkspaceService } from './structured-workspace-copy'
 import { readProjectFile, readWorkspaceFile } from './structured-project-disk'
-import { srcRepoDir, workspaceDir } from './structured-project-layout'
+import { workspaceRepoDir, workspaceDir } from './structured-project-layout'
 
 // The service resolves ~/orca/projects via os.homedir(); point HOME at a temp
 // dir so the whole flow runs on real filesystem without touching real data.
@@ -46,7 +46,10 @@ const seedSource = (name: string): string => {
 describe('copyStructuredWorkspaceService (real git)', () => {
   it('copies a workspace with its own sandbox ports and remounted worktrees', async () => {
     const source = seedSource('copy-src-repo')
-    createStructuredProjectService({ name: 'Penguin-go', services: ['redis'] })
+    createStructuredProjectService({
+      name: 'Penguin-go',
+      services: [{ name: 'redis', kind: 'redis' }]
+    })
     await createStructuredWorkspaceService({ project: 'Penguin-go', workspaceName: 'youho' })
     await addWorkspaceRepoService({
       project: 'Penguin-go',
@@ -72,7 +75,7 @@ describe('copyStructuredWorkspaceService (real git)', () => {
     expect(existsSync(join(ws2Dir, 'devops', 'docker-compose.yaml'))).toBe(true)
 
     // The repo was remounted as a worktree on the NEW workspace's branch.
-    const target = srcRepoDir(ws2Dir, 'qa-pk')
+    const target = workspaceRepoDir(ws2Dir, 'qa-pk')
     expect(copy.worktrees.map((w) => w.repoId)).toEqual(['qa-pk'])
     expect(readFileSync(join(target, '.git'), 'utf8')).toContain('gitdir:')
     const branch = execFileSync('git', ['-C', target, 'rev-parse', '--abbrev-ref', 'HEAD'], {
@@ -103,7 +106,7 @@ describe('copyStructuredWorkspaceService (real git)', () => {
     })
 
     expect(registerManagedRepo).toHaveBeenCalledWith(source)
-    const target = srcRepoDir(workspaceDir(join(projectsDir(), 'Reg'), 'w2'), 'qa-pk')
+    const target = workspaceRepoDir(workspaceDir(join(projectsDir(), 'Reg'), 'w2'), 'qa-pk')
     expect(setWorktreeMeta).toHaveBeenCalledTimes(1)
     const [key, meta] = setWorktreeMeta.mock.calls[0]
     expect(key).toBe(`orca-uuid-1::${target}`)
@@ -111,7 +114,7 @@ describe('copyStructuredWorkspaceService (real git)', () => {
   })
 
   it('copies an empty workspace (no worktrees) without touching members', async () => {
-    createStructuredProjectService({ name: 'Empty', services: ['mysql'] })
+    createStructuredProjectService({ name: 'Empty', services: [{ name: 'mysql', kind: 'mysql' }] })
     await createStructuredWorkspaceService({ project: 'Empty', workspaceName: 'w1' })
 
     const copy = await copyStructuredWorkspaceService({

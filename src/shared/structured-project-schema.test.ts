@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import {
-  parseProjectJson,
-  parseWorkspaceJson,
-  STRUCTURED_SERVICE_KINDS
-} from './structured-project-schema'
+import { parseProjectJson, parseWorkspaceJson } from './structured-project-schema'
 
+// Uses the legacy on-disk shapes (bare kind strings / { kind, hostPort }) to
+// exercise the back-compat migration into the unified service spec.
 const validProject = {
   name: 'Penguin-go',
   members: [{ repoId: 'qa-pk', source: '/abs/path/to/qa-pk', defaultBranch: 'main' }],
-  services: ['mysql', 'redis', 'postgres', 'mongo'],
+  services: ['mysql', 'redis'],
   createdAt: '2026-07-04T00:21:40.326089+00:00'
 }
 
@@ -25,14 +23,52 @@ const validWorkspace = {
 }
 
 describe('parseProjectJson', () => {
-  it('accepts a valid project.json matching the Yoho prototype', () => {
+  it('migrates a legacy bare kind-string services array into specs', () => {
     const result = parseProjectJson(validProject)
     expect(result.ok).toBe(true)
     if (result.ok) {
       expect(result.value.name).toBe('Penguin-go')
       expect(result.value.members[0].repoId).toBe('qa-pk')
-      expect(result.value.services).toEqual([...STRUCTURED_SERVICE_KINDS])
+      expect(result.value.services).toEqual([
+        { name: 'mysql', kind: 'mysql' },
+        { name: 'redis', kind: 'redis' }
+      ])
     }
+  })
+
+  it('accepts a new preset + custom service spec array', () => {
+    const result = parseProjectJson({
+      ...validProject,
+      services: [
+        { name: 'mysql', kind: 'mysql' },
+        { name: 'my-kafka', kind: null, image: 'apache/kafka:3.8.0', containerPort: 9092 }
+      ]
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.services[1]).toEqual({
+        name: 'my-kafka',
+        kind: null,
+        image: 'apache/kafka:3.8.0',
+        containerPort: 9092
+      })
+    }
+  })
+
+  it('accepts the new preset kinds (kafka, elasticsearch, nacos)', () => {
+    const result = parseProjectJson({
+      ...validProject,
+      services: ['kafka', 'elasticsearch', 'nacos']
+    })
+    expect(result.ok).toBe(true)
+  })
+
+  it('rejects a custom service (kind=null) without an image', () => {
+    const result = parseProjectJson({
+      ...validProject,
+      services: [{ name: 'broken', kind: null, containerPort: 1234 }]
+    })
+    expect(result.ok).toBe(false)
   })
 
   it('tolerates unknown extra fields', () => {
@@ -61,12 +97,32 @@ describe('parseProjectJson', () => {
 })
 
 describe('parseWorkspaceJson', () => {
-  it('accepts a valid workspace.json matching the Yoho prototype', () => {
+  it('migrates legacy { kind, hostPort } services by filling name from kind', () => {
     const result = parseWorkspaceJson(validWorkspace)
     expect(result.ok).toBe(true)
     if (result.ok) {
       expect(result.value.infraMode).toBe('isolated')
-      expect(result.value.services[0]).toEqual({ kind: 'mysql', hostPort: 61918 })
+      expect(result.value.services[0]).toEqual({ name: 'mysql', kind: 'mysql', hostPort: 61918 })
+    }
+  })
+
+  it('accepts a custom service with its own image/port plus host port', () => {
+    const result = parseWorkspaceJson({
+      ...validWorkspace,
+      services: [
+        {
+          name: 'my-kafka',
+          kind: null,
+          image: 'apache/kafka:3.8.0',
+          containerPort: 9092,
+          hostPort: 20001
+        }
+      ]
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.services[0].name).toBe('my-kafka')
+      expect(result.value.services[0].kind).toBeNull()
     }
   })
 

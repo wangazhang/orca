@@ -14,7 +14,7 @@ function projectFile(name: string): StructuredProjectFile {
       { repoId: 'qa-pk', source: '/abs/qa-pk', defaultBranch: 'main' },
       { repoId: 'web', source: '/abs/web', defaultBranch: 'main' }
     ],
-    services: ['mysql'],
+    services: [{ name: 'mysql', kind: 'mysql' }],
     createdAt: '2026-07-04T00:21:40.326089+00:00'
   }
 }
@@ -60,7 +60,7 @@ describe('importStructuredProjectService', () => {
     expect(summary).toEqual({
       name: 'Beta',
       rootPath: externalRoot,
-      services: ['mysql'],
+      services: [{ name: 'mysql', kind: 'mysql' }],
       memberCount: 2
     })
     expect(readRegisteredRoots(rootsFile)).toEqual([externalRoot])

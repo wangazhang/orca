@@ -14,12 +14,12 @@ import {
   devopsDir,
   devopsEnvPath,
   docDir,
-  srcDir,
+  workspaceReposDir,
   workspaceDir
 } from './structured-project-layout'
 import type {
   StructuredProjectFile,
-  StructuredServiceKind,
+  StructuredServiceSpec,
   StructuredWorkspaceFile
 } from '../../shared/structured-project-schema'
 
@@ -39,7 +39,7 @@ export type CreatedStructuredProject = {
 export function createStructuredProject(params: {
   name: string
   rootPath: string
-  services: StructuredServiceKind[]
+  services: StructuredServiceSpec[]
   now?: number
 }): CreatedStructuredProject {
   const now = params.now ?? Date.now()
@@ -63,23 +63,23 @@ export async function createStructuredWorkspace(params: {
   rootPath: string
   projectName: string
   workspaceName: string
-  services: StructuredServiceKind[]
+  services: StructuredServiceSpec[]
   now?: number
   portOptions?: PortAllocationOptions
 }): Promise<CreatedStructuredWorkspace> {
   const now = params.now ?? Date.now()
   const wsDir = workspaceDir(params.rootPath, params.workspaceName)
 
-  // Fixed workspace skeleton: doc/ devops/ src/.
+  // Fixed workspace skeleton: doc/ devops/ repos/.
   mkdirSync(docDir(wsDir), { recursive: true })
   mkdirSync(devopsDir(wsDir), { recursive: true })
-  mkdirSync(srcDir(wsDir), { recursive: true })
+  mkdirSync(workspaceReposDir(wsDir), { recursive: true })
 
   // Isolated sandbox: one host port per service, generated compose + .env, and a
   // data volume directory per service so bind mounts have a target.
   const services = await assignServicePorts(params.services, params.portOptions)
   for (const service of services) {
-    mkdirSync(devopsDataDir(wsDir, service.kind), { recursive: true })
+    mkdirSync(devopsDataDir(wsDir, service.name), { recursive: true })
   }
   const sandbox = generateDevopsSandbox(services)
   writeFileAtomically(devopsComposePath(wsDir), sandbox.composeYaml)

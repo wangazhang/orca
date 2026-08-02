@@ -1200,23 +1200,34 @@ async function listRecentWorkItems(
         .map((item) => mapPullRequestWorkItem(item, prOwnerRepo))
       prs = await hydrateWorkItemRepositoryMergeMetadata(prs, prOwnerRepo, ghOptions)
     } else {
-      // Why: PR-side failures must preserve the pre-diff behavior of
-      // Promise.all by re-throwing so the rejection propagates up through
-      // listWorkItems to the renderer's cross-repo aggregator (which counts
-      // the repo as failed). This feature is scoped to the issue-side silent
-      // wrongness from #1076; PR errors must not be silently swallowed here.
-      // Why: if the issue side ALSO failed, the classified issuesError would
-      // otherwise be silently dropped when we throw the PR reason. Log it so
-      // debugging both-sides-failed scenarios (e.g. 403 on both endpoints)
-      // isn't blind to the issue-side classification.
-      if (issuesError) {
-        console.warn(
-          'listRecentWorkItems: both issue and PR sides failed; issuesError was classified:',
-          issuesError.type,
-          issuesError.message
-        )
+      const prStderr =
+        prsSettled.reason instanceof Error ? prsSettled.reason.message : String(prsSettled.reason)
+      // Why: a mixed project mounts non-GitHub repos alongside GitHub ones. When
+      // the PR side falls back to cwd resolution on such a repo, gh deterministically
+      // reports "none of the git remotes... known GitHub host". Treat that as "no
+      // GitHub work items here" (empty prs) instead of re-throwing — otherwise one
+      // non-GitHub repo throws out of the handler and the renderer's cross-repo
+      // aggregator drops the entire list, leaving the repo list incomplete. The
+      // queried path (listQueriedWorkItems) and the fallback path already do this.
+      if (!isGhCwdRepoResolutionFailure(prStderr)) {
+        // Why: PR-side failures must preserve the pre-diff behavior of
+        // Promise.all by re-throwing so the rejection propagates up through
+        // listWorkItems to the renderer's cross-repo aggregator (which counts
+        // the repo as failed). This feature is scoped to the issue-side silent
+        // wrongness from #1076; PR errors must not be silently swallowed here.
+        // Why: if the issue side ALSO failed, the classified issuesError would
+        // otherwise be silently dropped when we throw the PR reason. Log it so
+        // debugging both-sides-failed scenarios (e.g. 403 on both endpoints)
+        // isn't blind to the issue-side classification.
+        if (issuesError) {
+          console.warn(
+            'listRecentWorkItems: both issue and PR sides failed; issuesError was classified:',
+            issuesError.type,
+            issuesError.message
+          )
+        }
+        throw prsSettled.reason
       }
-      throw prsSettled.reason
     }
 
     return {
@@ -1226,27 +1237,48 @@ async function listRecentWorkItems(
   }
 
   // Why: the fallback path (non-GitHub remote — neither issueOwnerRepo nor
-  // prOwnerRepo resolved) intentionally stays on Promise.all rather than the
-  // Promise.allSettled + per-side classification used above. There are no
-  // `sources` to surface on this branch and nothing for the partial-failure
-  // banner to render, so a single-side failure here means the whole call is
-  // effectively unusable for the feature — reject-all matches reality. If
-  // non-GitHub remotes ever grow source metadata, revisit this symmetry.
-  const [issuesResult, prsResult] = await Promise.all([
+  // prOwnerRepo resolved) uses allSettled so a deterministic cwd-resolution
+  // failure ("none of the git remotes... known GitHub host") is treated as
+  // "this repo has no GitHub work items" — an empty result, not a rejection
+  // that would fail the whole repo in the renderer's cross-repo aggregator and
+  // leave the Tasks list incomplete. A genuine failure (rate limit, network)
+  // still propagates.
+  const [issuesSettled, prsSettled] = await Promise.allSettled([
     ghCwdResolvedExec(repoContext, issueRequest.args, ghOptions),
     ghCwdResolvedExec(repoContext, prRequest.args, ghOptions)
   ])
 
-  const issues = (JSON.parse(issuesResult.stdout) as Record<string, unknown>[])
-    .filter((item) => !('pull_request' in item))
-    .map(mapIssueWorkItem)
-  const prs = (JSON.parse(prsResult.stdout) as Record<string, unknown>[])
-    .slice(prRequest.offset, prRequest.offset + limit)
-    .map((item) => mapPullRequestWorkItem(item, null))
+  const issues = extractCwdFallbackItems(issuesSettled, (stdout) =>
+    (JSON.parse(stdout) as Record<string, unknown>[])
+      .filter((item) => !('pull_request' in item))
+      .map(mapIssueWorkItem)
+  )
+  const prs = extractCwdFallbackItems(prsSettled, (stdout) =>
+    (JSON.parse(stdout) as Record<string, unknown>[])
+      .slice(prRequest.offset, prRequest.offset + limit)
+      .map((item) => mapPullRequestWorkItem(item, null))
+  )
 
   return {
     items: sortWorkItemsByNumber([...issues, ...prs]).slice(0, limit)
   }
+}
+
+// Why: on the non-GitHub-remote fallback path, a gh cwd-resolution failure means
+// the repo simply isn't a GitHub repo — yield no items instead of failing the
+// repo. Any other rejection is a real error and is re-thrown.
+function extractCwdFallbackItems(
+  settled: PromiseSettledResult<{ stdout: string }>,
+  parse: (stdout: string) => MainWorkItem[]
+): MainWorkItem[] {
+  if (settled.status === 'fulfilled') {
+    return parse(settled.value.stdout)
+  }
+  const stderr = settled.reason instanceof Error ? settled.reason.message : String(settled.reason)
+  if (isGhCwdRepoResolutionFailure(stderr)) {
+    return []
+  }
+  throw settled.reason
 }
 
 async function listQueriedWorkItems(
@@ -1302,6 +1334,12 @@ async function listQueriedWorkItems(
       return { items }
     } catch (err) {
       const stderr = err instanceof Error ? err.message : String(err)
+      // Why: non-GitHub remote — treat as "no GitHub work items here" rather
+      // than an error, mirroring the PR side. No issuesError banner for a repo
+      // that simply isn't a GitHub repo.
+      if (isGhCwdRepoResolutionFailure(stderr)) {
+        return { items: [] }
+      }
       if (classifyGitHubUnavailable(stderr)) {
         availabilityError ??= err
       } else {
@@ -1339,8 +1377,15 @@ async function listQueriedWorkItems(
       }
       return hydrated
     } catch (err) {
-      console.warn('listQueriedWorkItems PRs partial failure:', err)
       const stderr = err instanceof Error ? err.message : String(err)
+      // Why: a non-GitHub remote (no github.com owner/repo resolves) makes gh's
+      // cwd fallback deterministically report "none of the git remotes...".
+      // That's "this repo has no GitHub work items", not a failure — return
+      // empty without counting it as a failure or logging noise.
+      if (isGhCwdRepoResolutionFailure(stderr)) {
+        return []
+      }
+      console.warn('listQueriedWorkItems PRs partial failure:', err)
       if (classifyGitHubUnavailable(stderr)) {
         availabilityError ??= err
       } else {

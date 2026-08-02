@@ -1,57 +1,32 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
-import type { StructuredServiceKind } from '../../../../shared/structured-project-schema'
-import { translate } from '@/i18n/i18n'
 import { useIterationRepos } from './useIterationRepos'
-import type { MountedRepoView, ReposDropHandlers } from './useIterationRepos'
-import { materializeAndRefreshStructured } from './structured-materialize-refresh'
+import { useSandboxServiceSelection } from './useSandboxServiceSelection'
+import { useProjectRepoDrafts } from './useProjectRepoDrafts'
+import { useStructuredWizardFinish } from './useStructuredWizardFinish'
+import { useWorkspaceIsFirstWorkspace } from './useWorkspaceIsFirstWorkspace'
+import {
+  STEP_ORDER,
+  type StructuredIterationWizard,
+  type WizardStep
+} from './structured-iteration-wizard-types'
 
-export type { MountedRepoView, PendingRepo, ReposDropHandlers } from './useIterationRepos'
-
-// A structured iteration is an on-disk project root (doc + isolated sandbox +
-// multiple git-worktree repos). This wizard drives the three iteration.* runtime
-// methods in order; disk stays the source of truth, so a partially-completed run
-// still leaves a valid project/workspace behind.
-export type WizardStep = 'project' | 'workspace' | 'repos'
+export type {
+  MountedRepoView,
+  PendingRepo,
+  ProjectMemberView,
+  ReposDropHandlers
+} from './useIterationRepos'
+export type { ProjectRepoDraft } from './useProjectRepoDrafts'
+export type { StructuredIterationWizard, WizardStep } from './structured-iteration-wizard-types'
 
 // The sidebar's structured-group "+" buttons reopen this wizard mid-flow via
 // modalData: an existing project's top group jumps to 'workspace', a workspace
 // group jumps to 'repos'. A plain open (no modalData) starts fresh at 'project'.
 function readStartStep(value: unknown): WizardStep {
   return value === 'workspace' || value === 'repos' ? value : 'project'
-}
-
-export type StructuredIterationWizard = {
-  isOpen: boolean
-  step: WizardStep
-  projectName: string
-  setProjectName: (value: string) => void
-  projectRoot: string
-  setProjectRoot: (value: string) => void
-  handlePickProjectRoot: () => void
-  services: Set<StructuredServiceKind>
-  toggleService: (kind: StructuredServiceKind) => void
-  workspaceName: string
-  setWorkspaceName: (value: string) => void
-  workspaceIsFirst: boolean
-  mountedRepos: MountedRepoView[]
-  busy: boolean
-  error: string | null
-  clearError: () => void
-  createdProject: string
-  handleCreateProject: (after: 'workspace' | 'finish') => void
-  handleCreateWorkspace: () => void
-  handleSkipWorkspace: () => void
-  handleAddRepo: () => void
-  handleRemovePendingRepo: (source: string) => void
-  reposDropTarget: ReturnType<typeof useIterationRepos>['reposDropTarget']
-  reposDropHandlers: ReposDropHandlers
-  isReposDragOver: boolean
-  runMaterializeAndClose: (project: string) => void
-  handleOpenChange: (open: boolean) => void
 }
 
 export function useStructuredIterationWizard(): StructuredIterationWizard {
@@ -70,31 +45,31 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
   // the target project/workspace already filled in.
   const seededProject = typeof modalData.project === 'string' ? modalData.project : ''
   const seededWorkspace = typeof modalData.workspace === 'string' ? modalData.workspace : ''
-  const [step, setStep] = useState<WizardStep>(() => readStartStep(modalData.startAt))
+  const [startStep] = useState<WizardStep>(() => readStartStep(modalData.startAt))
+  const [step, setStep] = useState<WizardStep>(startStep)
   const [projectName, setProjectName] = useState(seededProject)
-  // Parent directory for the new project root. Empty = let the backend use its
-  // default (~/orca/projects). Only meaningful when creating a fresh project.
+  // Default the first workspace's name to a version-style seed ("V1") rather
+  // than leaving it blank — it reads as an iteration/version the user renames to
+  // match the business logic, instead of the opaque derived shortname (e.g.
+  // "ITE") the generic name pipeline would otherwise produce.
+  const DEFAULT_FIRST_WORKSPACE_NAME = 'V1'
   const [projectRoot, setProjectRoot] = useState('')
-  const [services, setServices] = useState<Set<StructuredServiceKind>>(new Set())
-  const [workspaceName, setWorkspaceName] = useState(seededWorkspace)
+  const sandbox = useSandboxServiceSelection({ target })
+  const [activePanel, setActivePanel] = useState<'sandbox' | 'repos' | null>(null)
+  const [workspaceName, setWorkspaceName] = useState(
+    seededWorkspace || (startStep === 'project' ? DEFAULT_FIRST_WORKSPACE_NAME : '')
+  )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Whether the workspace step is creating the project's very first workspace.
-  // Fresh projects (created in this wizard) always are; a mid-flow re-entry on an
-  // existing project fetches the current count to pick a neutral title instead.
-  const [workspaceIsFirst, setWorkspaceIsFirst] = useState(true)
-  // Captured from the create response, or seeded from modalData on a mid-flow
-  // re-entry, so later steps address the exact project the runtime scaffolded.
   const [createdProject, setCreatedProject] = useState(seededProject)
-  // True only when this wizard just created the project; a mid-flow re-entry
-  // targets a project that already lives in the tree, so skipping there closes
-  // without re-materializing.
-  const [projectIsNew] = useState(() => readStartStep(modalData.startAt) === 'project')
+  // Names already scaffolded on disk this run, so stepping Back and forward again
+  // advances instead of re-creating (which would fail or duplicate).
+  const [committedProject, setCommittedProject] = useState(seededProject)
+  const [committedWorkspace, setCommittedWorkspace] = useState(seededWorkspace)
+  const [projectIsNew] = useState(() => startStep === 'project')
 
   const clearError = useCallback(() => setError(null), [])
 
-  // Browse for a parent directory; leaving it empty keeps the backend default.
-  // Reuses the same folder picker the repo-mount flow uses.
   const handlePickProjectRoot = useCallback(async () => {
     if (busy) {
       return
@@ -106,8 +81,18 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
     }
   }, [busy, clearError, mountedRef])
 
+  const revealReposPanel = useCallback(() => setActivePanel('repos'), [])
+  const drafts = useProjectRepoDrafts({
+    isOpen,
+    isProjectStep: step === 'project',
+    busy,
+    clearError,
+    mountedRef,
+    onFolderDropped: revealReposPanel
+  })
+
   // The repos step's state and native folder-drop wiring live in a focused hook;
-  // the wizard only orchestrates the step flow and the deferred mount on Done.
+  // the wizard only orchestrates the step flow and the deferred mount on finish.
   const repos = useIterationRepos({
     isOpen,
     isReposStep: step === 'repos',
@@ -120,103 +105,81 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
     mountedRef
   })
 
-  // On the workspace step, decide whether this is the project's first workspace so
-  // the title reads "Create the first workspace" only when it truly is one. A
-  // freshly created project has none; a re-entry on an existing project asks disk.
-  useEffect(() => {
-    if (!isOpen || step !== 'workspace') {
+  // Step back one place in the flow. Safe even after a create: the forward
+  // handlers no-op when the target already exists on disk.
+  const canGoBack = STEP_ORDER.indexOf(step) > STEP_ORDER.indexOf(startStep)
+  const handleBack = useCallback(() => {
+    if (busy) {
       return
     }
-    if (projectIsNew) {
-      setWorkspaceIsFirst(true)
-      return
-    }
-    const project = createdProject.trim()
-    if (!project) {
-      setWorkspaceIsFirst(true)
-      return
-    }
-    let cancelled = false
-    void (async () => {
-      try {
-        const result = await callRuntimeRpc<{ project?: { workspaces?: unknown[] } }>(
-          target,
-          'iteration.get',
-          { project }
-        )
-        if (cancelled || !mountedRef.current) {
-          return
-        }
-        setWorkspaceIsFirst((result.project?.workspaces?.length ?? 0) === 0)
-      } catch {
-        if (!cancelled && mountedRef.current) {
-          setWorkspaceIsFirst(true)
-        }
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [isOpen, step, projectIsNew, createdProject, target, mountedRef])
-
-  const toggleService = useCallback((kind: StructuredServiceKind) => {
-    setServices((prev) => {
-      const next = new Set(prev)
-      if (next.has(kind)) {
-        next.delete(kind)
-      } else {
-        next.add(kind)
-      }
-      return next
+    setError(null)
+    setStep((prev) => {
+      const index = STEP_ORDER.indexOf(prev)
+      const floor = STEP_ORDER.indexOf(startStep)
+      return index > floor ? STEP_ORDER[index - 1] : prev
     })
-  }, [])
+  }, [busy, startStep])
 
-  // Project the finished iteration into orca's native records (top group →
-  // workspace groups → overview folder workspaces; shared src repos registered +
-  // pinned) so it renders in the main WorktreeList. Idempotent, so every exit
-  // path (finish, project-only, skip) can share it. Manages busy itself.
-  const mountPendingRepos = repos.mountPendingRepos
-  const runMaterializeAndClose = useCallback(
-    async (project: string) => {
-      setBusy(true)
-      setError(null)
-      // Deferred adds: mount every queued folder before materializing. A failure
-      // leaves the user on the step with a message and does not close.
-      const mounted = await mountPendingRepos(project)
-      if (!mounted) {
-        if (mountedRef.current) {
-          setBusy(false)
-        }
-        return
-      }
-      try {
-        await materializeAndRefreshStructured(target, project)
-      } catch (err) {
-        if (mountedRef.current) {
-          setError(err instanceof Error ? err.message : String(err))
-          setBusy(false)
-        }
-        return
-      }
-      if (!mountedRef.current) {
-        return
-      }
-      toast.success(
-        translate(
-          'auto.components.sidebar.NewStructuredIterationDialog.finishTitle',
-          'Structured iteration ready'
-        ),
-        { description: project }
-      )
-      closeModal()
-    },
-    [closeModal, mountPendingRepos, mountedRef, target]
+  // On the workspace step, decide whether this is the project's first workspace.
+  const workspaceIsFirst = useWorkspaceIsFirstWorkspace({
+    isOpen,
+    isWorkspaceStep: step === 'workspace',
+    projectIsNew,
+    project: createdProject,
+    target,
+    mountedRef
+  })
+
+  // Auto-detect middleware from whatever repos are known at this point: the
+  // project step scans queued local folders, the sandbox step scans the project's
+  // full roster (members are always local paths — URL members were cloned first).
+  // The selection hook only ever adds suggestions and honors user dismissals.
+  const runDetect = sandbox.runDetect
+  const localDraftPaths = drafts.localDraftPaths
+  const memberPaths = useMemo(
+    () => repos.projectMembers.map((member) => member.source),
+    [repos.projectMembers]
   )
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+    if (step === 'project' && localDraftPaths.length > 0) {
+      runDetect(localDraftPaths)
+      return
+    }
+    if (step === 'sandbox' && memberPaths.length > 0) {
+      runDetect(memberPaths)
+    }
+  }, [isOpen, step, localDraftPaths, memberPaths, runDetect])
 
+  // Project the finished iteration into orca's native records so it renders in the
+  // main WorktreeList; also applies the sandbox picks when finishing.
+  const runMaterializeAndClose = useStructuredWizardFinish({
+    target,
+    workspaceName,
+    sandbox,
+    mountPendingRepos: repos.mountPendingRepos,
+    setBusy,
+    setError,
+    closeModal,
+    mountedRef
+  })
+
+  const projectRepoDrafts = drafts.projectRepoDrafts
   const handleCreateProject = useCallback(
     async (after: 'workspace' | 'finish') => {
       const name = projectName.trim()
       if (!name || busy) {
+        return
+      }
+      // Returning here after a Back must not re-create the project.
+      if (committedProject && committedProject === name) {
+        if (after === 'workspace') {
+          setStep('workspace')
+        } else {
+          await runMaterializeAndClose(committedProject)
+        }
         return
       }
       setBusy(true)
@@ -228,7 +191,7 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
           'iteration.create',
           {
             name,
-            services: [...services],
+            services: sandbox.toSpecs(),
             // Empty = backend default (~/orca/projects). The backend joins
             // parentDir + name into the full root.
             parentDir: projectRoot.trim() || undefined
@@ -246,6 +209,27 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
         return
       }
       setCreatedProject(created)
+      setCommittedProject(created)
+      // Attach queued project repos as members. A Git URL is cloned by the
+      // backend; a local folder is registered in place. Failures surface but don't
+      // abort — the project exists and repos can be added later.
+      if (projectRepoDrafts.length > 0) {
+        try {
+          for (const draft of projectRepoDrafts) {
+            await callRuntimeRpc(target, 'iteration.addProjectRepo', {
+              project: created,
+              source: draft.source
+            })
+          }
+        } catch (err) {
+          if (mountedRef.current) {
+            setError(err instanceof Error ? err.message : String(err))
+          }
+        }
+      }
+      if (!mountedRef.current) {
+        return
+      }
       if (after === 'workspace') {
         setStep('workspace')
         setBusy(false)
@@ -255,12 +239,27 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
         await runMaterializeAndClose(created)
       }
     },
-    [busy, mountedRef, projectName, projectRoot, runMaterializeAndClose, services, target]
+    [
+      busy,
+      committedProject,
+      mountedRef,
+      projectName,
+      projectRepoDrafts,
+      projectRoot,
+      runMaterializeAndClose,
+      sandbox,
+      target
+    ]
   )
 
   const handleCreateWorkspace = useCallback(async () => {
     const name = workspaceName.trim()
     if (!name || busy) {
+      return
+    }
+    // Returning here after a Back must not re-create the workspace.
+    if (committedWorkspace && committedWorkspace === name) {
+      setStep('repos')
       return
     }
     setBusy(true)
@@ -270,6 +269,7 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
       if (!mountedRef.current) {
         return
       }
+      setCommittedWorkspace(name)
       setStep('repos')
     } catch (err) {
       if (mountedRef.current) {
@@ -280,7 +280,7 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
         setBusy(false)
       }
     }
-  }, [busy, createdProject, mountedRef, target, workspaceName])
+  }, [busy, committedWorkspace, createdProject, mountedRef, target, workspaceName])
 
   const handleSkipWorkspace = useCallback(() => {
     if (busy) {
@@ -295,6 +295,20 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
     }
   }, [busy, closeModal, createdProject, projectIsNew, runMaterializeAndClose])
 
+  // Repos step → sandbox step. Nothing is committed yet (mounts are deferred to
+  // finish), so this is a pure navigation.
+  const handleReposContinue = useCallback(() => {
+    if (busy) {
+      return
+    }
+    setError(null)
+    setStep('sandbox')
+  }, [busy])
+
+  const handleFinish = useCallback(() => {
+    void runMaterializeAndClose(createdProject, { applyServices: true })
+  }, [createdProject, runMaterializeAndClose])
+
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (!open) {
@@ -305,6 +319,7 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
   )
 
   return {
+    ...drafts,
     isOpen,
     step,
     projectName,
@@ -312,25 +327,31 @@ export function useStructuredIterationWizard(): StructuredIterationWizard {
     projectRoot,
     setProjectRoot,
     handlePickProjectRoot,
-    services,
-    toggleService,
+    sandbox,
+    activePanel,
+    setActivePanel,
     workspaceName,
     setWorkspaceName,
     workspaceIsFirst,
     mountedRepos: repos.mountedRepos,
+    projectMembers: repos.projectMembers,
+    toggleMemberSelected: repos.toggleMemberSelected,
     busy,
     error,
     clearError,
     createdProject,
+    canGoBack,
+    handleBack,
     handleCreateProject,
     handleCreateWorkspace,
     handleSkipWorkspace,
+    handleReposContinue,
     handleAddRepo: repos.handleAddRepo,
     handleRemovePendingRepo: repos.handleRemovePendingRepo,
     reposDropTarget: repos.reposDropTarget,
     reposDropHandlers: repos.reposDropHandlers,
     isReposDragOver: repos.isReposDragOver,
-    runMaterializeAndClose,
+    handleFinish,
     handleOpenChange
   }
 }

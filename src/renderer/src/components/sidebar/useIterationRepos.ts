@@ -1,12 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
 import type { StructuredWorkspaceWorktree } from '../../../../shared/structured-project-schema'
-import {
-  NATIVE_FILE_DROP_TARGET,
-  hasNativeFileDragTypes
-} from '../../../../shared/native-file-drop'
+import { NATIVE_FILE_DROP_TARGET } from '../../../../shared/native-file-drop'
+import { useNativeFolderDropZone } from './useNativeFolderDropZone'
 import { translate } from '@/i18n/i18n'
 
 // One row in the repos step's mounted-repo list. `isNew` marks repos this wizard
@@ -28,6 +26,17 @@ export type MountedRepoView = {
 export type PendingRepo = {
   source: string
   repoName: string
+}
+
+// One entry in the project's full repo roster (project.json members), shown as a
+// checklist in the repos step so a workspace mounts a chosen subset rather than
+// making the user re-locate each folder. `mounted` marks members already in this
+// workspace; `selected` marks ones queued to mount on Done.
+export type ProjectMemberView = {
+  repoId: string
+  source: string
+  mounted: boolean
+  selected: boolean
 }
 
 // The repos-step drop zone's native-file-drop wiring, mirrored from
@@ -58,6 +67,10 @@ export type UseIterationReposResult = {
   reposDropHandlers: ReposDropHandlers
   isReposDragOver: boolean
   refreshMountedRepos: () => Promise<void>
+  // The project's full repo roster for the checklist, each flagged mounted/selected.
+  projectMembers: ProjectMemberView[]
+  // Toggle a roster member into/out of the deferred mount queue.
+  toggleMemberSelected: (repoId: string) => void
   // Deferred adds: mount every queued folder for `project`, returning false (and
   // leaving the queue intact from the failure onward) if one add fails.
   mountPendingRepos: (project: string) => Promise<boolean>
@@ -79,28 +92,37 @@ export function useIterationRepos(args: UseIterationReposArgs): UseIterationRepo
   // Folders queued this session but not mounted yet: the actual workspaceAddRepo
   // calls are deferred to Done so the user can review and drop entries first.
   const [pendingRepos, setPendingRepos] = useState<PendingRepo[]>([])
+  // The project's full repo roster (project.json members) for the checklist.
+  const [members, setMembers] = useState<{ repoId: string; source: string }[]>([])
 
-  // Best-effort load of the workspace's already-mounted repos from disk (the
-  // source of truth is each <ws>/.yoho/workspace.json). Failures are non-fatal.
+  // Best-effort load of the workspace's already-mounted repos AND the project's
+  // full member roster from one iteration.get (disk is the source of truth).
+  // Failures are non-fatal — the step still allows manual folder adds.
   const refreshMountedRepos = useCallback(async () => {
     const project = createdProject.trim()
     const workspace = workspaceName.trim()
     if (!project || !workspace) {
       setExistingRepos([])
+      setMembers([])
       return
     }
     try {
       const result = await callRuntimeRpc<{
-        project?: { workspaces?: { name: string; worktrees: StructuredWorkspaceWorktree[] }[] }
+        project?: {
+          members?: { repoId: string; source: string }[]
+          workspaces?: { name: string; worktrees: StructuredWorkspaceWorktree[] }[]
+        }
       }>(target, 'iteration.get', { project })
       if (!mountedRef.current) {
         return
       }
       const ws = result.project?.workspaces?.find((entry) => entry.name === workspace)
       setExistingRepos(ws?.worktrees ?? [])
+      setMembers(result.project?.members ?? [])
     } catch {
       if (mountedRef.current) {
         setExistingRepos([])
+        setMembers([])
       }
     }
   }, [createdProject, mountedRef, target, workspaceName])
@@ -147,11 +169,48 @@ export function useIterationRepos(args: UseIterationReposArgs): UseIterationRepo
     return [...existing, ...added, ...pending]
   }, [existingRepos, sessionRepos, pendingRepos])
 
-  // Git-detect a chosen/dropped folder and, if it is a repo, queue it for Done.
-  // Not-a-repo folders and duplicates are rejected inline without queueing.
+  // The roster checklist: each project member flagged whether it is already
+  // mounted in this workspace (by repoId) or currently queued to mount (by source).
+  const projectMembers = useMemo<ProjectMemberView[]>(() => {
+    const mountedIds = new Set(existingRepos.map((repo) => repo.repoId))
+    const sessionIds = new Set(sessionRepos.map((repo) => repo.repoId))
+    const pendingSources = new Set(pendingRepos.map((repo) => repo.source))
+    return members.map((member) => ({
+      repoId: member.repoId,
+      source: member.source,
+      mounted: mountedIds.has(member.repoId) || sessionIds.has(member.repoId),
+      selected: pendingSources.has(member.source)
+    }))
+  }, [members, existingRepos, sessionRepos, pendingRepos])
+
+  // Check/uncheck a roster member: adds it to (or removes it from) the deferred
+  // mount queue. Already-mounted members are left alone. Reuses the pending
+  // pipeline so Done mounts checked members exactly like manually added folders.
+  const toggleMemberSelected = useCallback(
+    (repoId: string) => {
+      const member = members.find((entry) => entry.repoId === repoId)
+      if (!member) {
+        return
+      }
+      setPendingRepos((prev) =>
+        prev.some((entry) => entry.source === member.source)
+          ? prev.filter((entry) => entry.source !== member.source)
+          : [...prev, { source: member.source, repoName: member.repoId }]
+      )
+    },
+    [members]
+  )
+
+  // Git-detect a chosen/dropped folder and, if it is a repo, add it back into the
+  // project's roster (project.json members) and queue it to mount in this
+  // workspace. Not-a-repo folders are rejected inline; duplicates are no-ops.
+  // Why: the repos step lists the project roster; a freshly added folder must
+  // join that roster (reverse-write) so it shows up as a checked member here and
+  // is available to other workspaces later — not just mounted ad hoc.
   const queueRepo = useCallback(
     async (source: string) => {
-      if (busy || !source) {
+      const project = createdProject.trim()
+      if (busy || !source || !project) {
         return
       }
       setBusy(true)
@@ -174,11 +233,20 @@ export function useIterationRepos(args: UseIterationReposArgs): UseIterationRepo
           )
           return
         }
+        // Reverse-write into the project roster so the new repo persists at the
+        // project level (idempotent by repoId on the backend).
+        await callRuntimeRpc(target, 'iteration.addProjectRepo', { project, source })
+        if (!mountedRef.current) {
+          return
+        }
+        // Default-check it for this workspace: queue it to mount on Done.
         setPendingRepos((prev) =>
           prev.some((entry) => entry.source === source)
             ? prev
             : [...prev, { source, repoName: result.repoName }]
         )
+        // Refresh the roster so the new repo appears as a checked member row.
+        await refreshMountedRepos()
       } catch (err) {
         if (mountedRef.current) {
           setError(err instanceof Error ? err.message : String(err))
@@ -189,7 +257,7 @@ export function useIterationRepos(args: UseIterationReposArgs): UseIterationRepo
         }
       }
     },
-    [busy, mountedRef, setBusy, setError, target]
+    [busy, createdProject, mountedRef, refreshMountedRepos, setBusy, setError, target]
   )
 
   const handleAddRepo = useCallback(async () => {
@@ -257,53 +325,9 @@ export function useIterationRepos(args: UseIterationReposArgs): UseIterationRepo
     })
   }, [isOpen, isReposStep, queueRepo])
 
-  // Highlight the drop zone while a native folder hovers, mirroring
-  // useSidebarProjectDrop's depth-counted enter/leave bookkeeping.
-  const [isReposDragOver, setIsReposDragOver] = useState(false)
-  const dragDepthRef = useRef(0)
-
-  useEffect(() => {
-    const clear = (): void => {
-      dragDepthRef.current = 0
-      setIsReposDragOver(false)
-    }
-    document.addEventListener('drop', clear, true)
-    document.addEventListener('dragend', clear, true)
-    return () => {
-      document.removeEventListener('drop', clear, true)
-      document.removeEventListener('dragend', clear, true)
-    }
-  }, [])
-
-  const reposDropHandlers = useMemo<ReposDropHandlers>(
-    () => ({
-      onDragEnter: (event) => {
-        if (!hasNativeFileDragTypes(event.dataTransfer.types)) {
-          return
-        }
-        dragDepthRef.current += 1
-        setIsReposDragOver(true)
-      },
-      onDragOver: (event) => {
-        if (!hasNativeFileDragTypes(event.dataTransfer.types)) {
-          return
-        }
-        event.preventDefault()
-        event.dataTransfer.dropEffect = 'copy'
-        setIsReposDragOver(true)
-      },
-      onDragLeave: (event) => {
-        if (!hasNativeFileDragTypes(event.dataTransfer.types)) {
-          return
-        }
-        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
-        if (dragDepthRef.current === 0) {
-          setIsReposDragOver(false)
-        }
-      }
-    }),
-    []
-  )
+  // Highlight the drop zone while a native folder hovers; the shared hook owns the
+  // depth-counted enter/leave bookkeeping.
+  const { isDragOver: isReposDragOver, dropHandlers: reposDropHandlers } = useNativeFolderDropZone()
 
   return {
     mountedRepos,
@@ -313,6 +337,8 @@ export function useIterationRepos(args: UseIterationReposArgs): UseIterationRepo
     reposDropHandlers,
     isReposDragOver,
     refreshMountedRepos,
+    projectMembers,
+    toggleMemberSelected,
     mountPendingRepos
   }
 }

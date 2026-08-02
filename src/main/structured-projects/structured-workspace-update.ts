@@ -18,7 +18,7 @@ import {
 } from './structured-project-layout'
 import { resolveProject } from './structured-project-service'
 import type {
-  StructuredServiceKind,
+  StructuredServiceSpec,
   StructuredWorkspaceFile,
   StructuredWorkspaceService
 } from '../../shared/structured-project-schema'
@@ -26,7 +26,7 @@ import type {
 export async function updateStructuredWorkspaceServicesService(params: {
   project: string
   workspace: string
-  services: StructuredServiceKind[]
+  services: StructuredServiceSpec[]
 }): Promise<StructuredWorkspaceFile> {
   const { rootPath } = resolveProject(params.project)
   const wsDir = workspaceDir(rootPath, params.workspace)
@@ -43,7 +43,7 @@ export async function updateStructuredWorkspaceServicesService(params: {
   // is idempotent for kept services). Removed services' data dirs are left in
   // place — dropping user data on a service toggle would be surprising.
   for (const service of services) {
-    mkdirSync(devopsDataDir(wsDir, service.kind), { recursive: true })
+    mkdirSync(devopsDataDir(wsDir, service.name), { recursive: true })
   }
 
   // Regenerate the sandbox from the new service set and rewrite it in place.
@@ -57,33 +57,35 @@ export async function updateStructuredWorkspaceServicesService(params: {
   return updated
 }
 
-// Builds the new services array in the requested order: kept kinds keep their
-// existing host port, new kinds are allocated ports that avoid the kept ones.
+// Builds the new services array in the requested order: kept services keep their
+// existing host port (matched by name), new ones are allocated ports that avoid
+// the kept ones. The requested spec wins for image/command (user may have edited
+// a custom service); only the port is preserved.
 async function diffServices(
   current: readonly StructuredWorkspaceService[],
-  requested: readonly StructuredServiceKind[]
+  requested: readonly StructuredServiceSpec[]
 ): Promise<StructuredWorkspaceService[]> {
-  const currentByKind = new Map(current.map((service) => [service.kind, service.hostPort]))
+  const currentByName = new Map(current.map((service) => [service.name, service.hostPort]))
 
   // Reserve already-allocated ports so freshly-added services never reuse one.
   const reserved = new Set<number>()
-  for (const kind of requested) {
-    const port = currentByKind.get(kind)
+  for (const spec of requested) {
+    const port = currentByName.get(spec.name)
     if (port !== undefined) {
       reserved.add(port)
     }
   }
 
-  const newKinds = requested.filter((kind) => !currentByKind.has(kind))
-  const allocated = await assignServicePorts(newKinds, { reserved })
-  const allocatedByKind = new Map(allocated.map((service) => [service.kind, service.hostPort]))
+  const newSpecs = requested.filter((spec) => !currentByName.has(spec.name))
+  const allocated = await assignServicePorts(newSpecs, { reserved })
+  const allocatedByName = new Map(allocated.map((service) => [service.name, service.hostPort]))
 
-  return requested.map((kind) => {
-    const port = currentByKind.get(kind) ?? allocatedByKind.get(kind)
+  return requested.map((spec) => {
+    const port = currentByName.get(spec.name) ?? allocatedByName.get(spec.name)
     if (port === undefined) {
-      // Defensive: every requested kind is either kept or freshly allocated.
-      throw new Error(`Failed to assign a host port for service "${kind}"`)
+      // Defensive: every requested service is either kept or freshly allocated.
+      throw new Error(`Failed to assign a host port for service "${spec.name}"`)
     }
-    return { kind, hostPort: port }
+    return { ...spec, hostPort: port }
   })
 }

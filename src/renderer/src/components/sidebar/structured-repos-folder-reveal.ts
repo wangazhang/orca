@@ -1,7 +1,7 @@
 import { useAppStore } from '@/store'
 import { getStructuredReposFolderKey } from './worktree-list-groups'
 
-// Expands each given workspace's "src" folder so repos freshly mounted into a
+// Expands each given workspace's "repos" folder so repos freshly mounted into a
 // structured workspace are visible immediately, instead of hidden inside the
 // default-collapsed folder. Inverted collapse semantics: presence in
 // collapsedGroups means expanded, so this only toggles folders that are

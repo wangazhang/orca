@@ -32,9 +32,9 @@ function worktreePathFromId(worktreeId: string): string | null {
   return idx === -1 ? null : worktreeId.slice(idx + 2)
 }
 
-// For a structured src worktree (which lives at <wsDir>/src/<repo>), the visible,
+// For a structured repo worktree (which lives at <wsDir>/repos/<repo>), the visible,
 // stably-revealable sidebar row is its workspace overview (FolderWorkspace at
-// wsDir) — NOT the leaf itself, which hides inside a default-collapsed "src"
+// wsDir) — NOT the leaf itself, which hides inside a default-collapsed "repos"
 // folder and would leave the reveal pending (breaking collapse). Returns the
 // folder-workspace reveal key of the deepest containing overview, if any.
 function overviewRevealKeyForPath(
@@ -68,7 +68,7 @@ export function resolveExistingRepoLocation(
       : undefined
 
   // Pass 1: a loaded worktree at this exact path. Reveal its workspace overview
-  // when the worktree sits inside one (structured src repo); otherwise the row is
+  // when the worktree sits inside one (structured repo); otherwise the row is
   // the worktree itself.
   for (const repo of ctx.repos) {
     for (const worktree of ctx.worktreesByRepo[repo.id] ?? []) {

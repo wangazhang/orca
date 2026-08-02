@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: sidebar row construction keeps every grouping mode in one pure module so reveal, virtualized rendering, and tests share the same flat row contract. */
-import { Boxes, CircleX, FolderGit2, FolderTree, List, Pin } from 'lucide-react'
+import { Boxes, CircleX, Database, FolderTree, List, Pin } from 'lucide-react'
 import type React from 'react'
 import type {
   DetectedWorktree,
@@ -14,6 +14,7 @@ import type {
   WorkspaceStatusDefinition
 } from '../../../../shared/types'
 import { branchName } from '../../lib/git-utils'
+import { getWorktreeGitIdentityDisplay } from '../../lib/worktree-git-identity-display'
 import {
   getWorkspaceStatus,
   getWorkspaceStatusFromGroupKey,
@@ -209,10 +210,11 @@ export function isStructuredReposFolderCollapsed(
   return !collapsedGroups.has(key)
 }
 
-// FolderGit2 marks the node as a repo folder rather than a plain folder.
+// Database's stacked cylinders read as a repository store rather than a plain
+// folder, which is what this node actually holds.
 export const STRUCTURED_REPOS_FOLDER_META = {
   tone: 'text-foreground',
-  icon: FolderGit2
+  icon: Database
 } as const
 
 // Every repos-folder key, for callers that need a fully-expanded layout (e.g.
@@ -230,15 +232,37 @@ export function getAllStructuredReposFolderKeys(
   return keys
 }
 
+// Per-workspace folder holding one worktree per mounted repo. 'repos' is the
+// current name; 'src' is what builds before the rename wrote to disk, and those
+// workspaces keep their old absolute paths in workspace.json — so both are
+// accepted or existing projects would lose every repo row.
+const STRUCTURED_WORKSPACE_REPO_DIRS = ['repos/', 'src/'] as const
+
 // A worktree belongs to a structured workspace when its path sits under the
-// workspace directory's src/ folder (that is where mountRepoIntoWorkspace checks
-// it out). Returns the leaf repo id (the src/<repoId> folder name) or null.
+// workspace directory's repos/ folder (that is where mountRepoIntoWorkspace
+// checks it out). Returns the leaf repo id (the repos/<repoId> folder name) or null.
 function structuredWorkspaceRepoIdFor(workspaceDir: string, worktreePath: string): string | null {
   const relative = relativePathInsideRoot(workspaceDir, worktreePath)
-  if (relative === null || !relative.startsWith('src/')) {
+  if (relative === null || !STRUCTURED_WORKSPACE_REPO_DIRS.some((d) => relative.startsWith(d))) {
     return null
   }
   return getRuntimePathBasename(worktreePath) || null
+}
+
+// Label for a structured repo row: the repo folder name plus its checked-out
+// branch, e.g. "mrs (v1.0.1)". All repos in a workspace share the workspace
+// branch, but showing it makes the row self-describing instead of a bare name.
+// Falls back to the name alone when there is no resolvable branch.
+function structuredRepoRowLabel(worktree: Worktree | undefined, repoId: string): string {
+  const name = getRuntimePathBasename(worktree?.path ?? '') || repoId
+  const identity = worktree ? getWorktreeGitIdentityDisplay(worktree) : null
+  if (identity?.kind === 'branch') {
+    return `${name} (${identity.branchName})`
+  }
+  if (identity?.kind === 'detached') {
+    return `${name} (${identity.shortHead})`
+  }
+  return name
 }
 
 function buildPendingCreationRow(
@@ -1600,7 +1624,7 @@ export function buildRows(
             ([repoId, items]): OrderedGroupEntry => [
               getStructuredRepoSectionKey(projectGroup.id, repoId),
               {
-                label: getRuntimePathBasename(items[0]?.path ?? '') || repoId,
+                label: structuredRepoRowLabel(items[0], repoId),
                 items,
                 repo: repoMap.get(repoId),
                 repoIds: new Set([repoId])
@@ -1616,10 +1640,10 @@ export function buildRows(
           result.push({
             type: 'header',
             key: reposFolderKey,
-            // Literal 'src' (not localized): the folder mirrors the on-disk
-            // <workspace>/src/ directory, so its name should match that path
+            // Literal 'repos' (not localized): the folder mirrors the on-disk
+            // <workspace>/repos/ directory, so its name should match that path
             // verbatim in every locale.
-            label: 'src',
+            label: 'repos',
             count: structuredEntries.length,
             tone: STRUCTURED_REPOS_FOLDER_META.tone,
             icon: STRUCTURED_REPOS_FOLDER_META.icon,
