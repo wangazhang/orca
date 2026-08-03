@@ -125,3 +125,25 @@ jobs:
           # instead of producing the ad-hoc artifact we actually want. Signed
           # releases would instead set ORCA_MAC_RELEASE=1 and supply CSC_LINK.
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      # Why this is a gate and not just a listing: the whole auto-update feature
+      # reads latest-*.yml from the release. Installers can build perfectly while
+      # that manifest is missing, and the failure only shows up later as clients
+      # silently never seeing an update. Assert it exists for this platform.
+      - name: Verify updater manifest was produced
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "--- dist/ ---"
+          ls -la dist/ || { echo "::error::no dist/ directory"; exit 1; }
+          case "${{ runner.os }}" in
+            macOS) manifest=latest-mac.yml ;;
+            Linux) manifest=latest-linux.yml ;;
+            *)     manifest=latest.yml ;;
+          esac
+          if [[ ! -f "dist/$manifest" ]]; then
+            echo "::error::dist/$manifest is missing — electron-updater clients would never see this release."
+            exit 1
+          fi
+          echo "--- $manifest ---"
+          cat "dist/$manifest"
