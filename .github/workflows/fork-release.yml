@@ -17,16 +17,22 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
-      tag:
-        description: Existing tag to build and publish
-        required: true
+      ref:
+        description: Branch, tag, or SHA to build
+        required: false
         type: string
+        default: main
+      dry_run:
+        description: Build the installers but do not publish a release
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: write
 
 concurrency:
-  group: fork-release-${{ inputs.tag || github.ref_name }}
+  group: fork-release-${{ inputs.ref || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -55,7 +61,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -72,10 +78,12 @@ jobs:
       # comes from package.json) against the version it resolved from the release
       # tag. If they disagree, the update silently reports "not available" and
       # the release looks broken with no error anywhere. Catch it before building.
+      # Only meaningful for a tag build — a dry run from a branch has no tag.
       - name: Verify tag matches package.json version
+        if: github.ref_type == 'tag'
         shell: bash
         env:
-          TAG: ${{ inputs.tag || github.ref_name }}
+          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           pkg_version="$(node -p "require('./package.json').version")"
@@ -105,8 +113,11 @@ jobs:
       - name: Build platform native helpers
         run: pnpm build:native
 
+      # Why the conditional publish: a manual dispatch defaults to dry_run, which
+      # exercises the whole pipeline (install, native helpers, packaging) without
+      # creating a public release. Tag pushes always publish.
       - name: Package and publish
-        run: pnpm exec electron-builder --config config/electron-builder.config.cjs ${{ matrix.platform }} --publish always
+        run: pnpm exec electron-builder --config config/electron-builder.config.cjs ${{ matrix.platform }} --publish ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && 'never' || 'always' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Why: this fork ships unsigned macOS builds. Without this, electron-builder
