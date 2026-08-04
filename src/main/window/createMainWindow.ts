@@ -1053,7 +1053,7 @@ export function createMainWindow(
           title: app.getName(),
           body: translateMain(
             'tray.minimizeNotice.body',
-            'Orca is still running in the system tray'
+            `${app.getName()} is still running in the system tray`
           )
         }).show()
       } catch {

@@ -67,6 +67,7 @@ import { onOnboardingReopened } from './components/onboarding/show-onboarding-ev
 import { shouldShowOnboarding } from './components/onboarding/should-show-onboarding'
 import { LicenseGate } from './components/license/LicenseGate'
 import { useLicenseStatus } from './components/license/useLicenseStatus'
+import { APP_DISPLAY_NAME } from '../../shared/app-identity'
 import { MarkdownTemplatePicker } from './components/editor/MarkdownTemplatePicker'
 import { FloatingTerminalToggleButton } from './components/floating-terminal/FloatingTerminalToggleButton'
 import { OrcaProfileSwitcher } from './components/orca-profiles/OrcaProfileSwitcher'
@@ -2098,13 +2099,8 @@ function App(): React.JSX.Element {
             {settings?.showTitlebarAppName !== false && (
               <ContextMenu>
                 <ContextMenuTrigger asChild>
-                  <div
-                    className="titlebar-app-name"
-                    aria-label={translate('auto.App.5096cbbc86', 'Orca')}
-                  >
-                    <span className="titlebar-app-name-main">
-                      {translate('auto.App.5096cbbc86', 'Orca')}
-                    </span>
+                  <div className="titlebar-app-name" aria-label={APP_DISPLAY_NAME}>
+                    <span className="titlebar-app-name-main">{APP_DISPLAY_NAME}</span>
                   </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent>

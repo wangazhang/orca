@@ -1,4 +1,4 @@
-import { Menu, Tray, nativeImage, nativeTheme, type NativeImage } from 'electron'
+import { app, Menu, Tray, nativeImage, nativeTheme, type NativeImage } from 'electron'
 import menuBarIconPath from '../../../resources/tray/orca-menu-barTemplate.png?asset&asarUnpack'
 import menuBarIconRetinaPath from '../../../resources/tray/orca-menu-barTemplate@2x.png?asset&asarUnpack'
 import { createAppIconImage } from '../app-icon'
@@ -45,10 +45,13 @@ let nativeThemeUpdatedListener: (() => void) | null = null
 // Why: multiple dev instances can run side by side (one per worktree); the
 // tooltip carries the worktree/branch label so hovering tells them apart.
 function baseTooltip(): string {
+  // Why app.getName(): the tooltip is user-visible, so it must follow the
+  // product name rather than pin a literal that survives a rename.
+  const name = app.getName()
   if (!devIndicator) {
-    return 'Orca'
+    return name
   }
-  return devIndicator.label ? `Orca DEV (${devIndicator.label})` : 'Orca DEV'
+  return devIndicator.label ? `${name} DEV (${devIndicator.label})` : `${name} DEV`
 }
 
 // Why: on Windows the notification area expects a 16px icon; the app icon PNG
@@ -87,7 +90,7 @@ function applyTrayImage(): void {
         tray.setToolTip(
           devIndicator
             ? `${baseTooltip()} - ${translateMain('tray.activityWaitingSuffix', 'activity waiting')}`
-            : translateMain('tray.activityWaiting', 'Orca - activity waiting')
+            : translateMain('tray.activityWaiting', `${app.getName()} - activity waiting`)
         )
         return
       } catch (error) {
@@ -242,7 +245,10 @@ export function createSystemTray(opts: SystemTrayOptions): Tray | null {
         ] as Electron.MenuItemConstructorOptions[])
       : []),
     {
-      label: translateMain('tray.openOrca', 'Open Orca'),
+      // Why the name is composed outside translateMain: before async i18n init
+      // it returns the fallback verbatim, so a '{{name}}' placeholder would
+      // render literally in the menu. Build the default string here instead.
+      label: translateMain('tray.openOrca', `Open ${app.getName()}`),
       click: safeMenuAction(() => opts.onOpen())
     },
     { type: 'separator' },
