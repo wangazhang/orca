@@ -57,8 +57,15 @@ const winSpeechNativeResource = {
 
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
-  appId: 'com.stablyai.orca',
-  productName: 'Orca',
+  // Why not upstream's com.stablyai.orca / "Orca": appId is the macOS bundle
+  // identity and productName decides the installed app name, which in turn
+  // decides the userData directory. Reusing them makes this build and an
+  // installed upstream Orca the same application to the OS — they overwrite
+  // each other in /Applications and share config and terminal history. These
+  // must stay in sync with BASE_APP_NAME / BASE_APP_USER_MODEL_ID in
+  // src/main/startup/dev-instance-identity.ts, which sets the runtime name.
+  appId: 'com.wangazhang.yoha',
+  productName: 'Yoha',
   directories: {
     buildResources: 'resources/build'
   },
@@ -220,7 +227,7 @@ module.exports = {
     ]
   },
   nsis: {
-    artifactName: 'orca-windows-setup.${ext}',
+    artifactName: 'yoha-windows-setup.${ext}',
     shortcutName: '${productName}',
     uninstallDisplayName: '${productName}',
     createDesktopShortcut: 'always',
@@ -307,12 +314,12 @@ module.exports = {
   // silently downgrading to ad-hoc artifacts that look shippable in CI logs.
   forceCodeSigning: isMacRelease,
   dmg: {
-    artifactName: 'orca-macos-${arch}.${ext}'
+    artifactName: 'yoha-macos-${arch}.${ext}'
   },
   linux: {
-    // Why: Ubuntu desktop ships GNOME Orca as the `orca` package and /usr/bin/orca.
-    // The Linux installer should not claim those system package/file names.
-    executableName: 'orca-ide',
+    // Why: Ubuntu desktop ships GNOME Orca as the `orca` package and /usr/bin/orca,
+    // and an upstream Orca deb owns `orca-ide`. Claim neither.
+    executableName: 'yoha',
     // Why: the icns source lets electron-builder emit standard hicolor PNG
     // sizes; a single 1024px PNG is ignored by some Linux docks/launchers.
     icon: 'resources/build/icon.icns',
@@ -320,7 +327,7 @@ module.exports = {
       entry: {
         // Why: Electron reports WM_CLASS=orca for the visible Linux window;
         // GNOME docks need an exact match to group it with orca-ide.desktop.
-        StartupWMClass: 'orca'
+        StartupWMClass: 'yoha'
       }
     },
     extraResources: [
@@ -345,11 +352,11 @@ module.exports = {
     category: 'Utility'
   },
   appImage: {
-    artifactName: isLinuxArm64Release ? 'orca-linux-arm64.${ext}' : 'orca-linux.${ext}'
+    artifactName: isLinuxArm64Release ? 'yoha-linux-arm64.${ext}' : 'yoha-linux.${ext}'
   },
   deb: {
-    packageName: 'orca-ide',
-    artifactName: 'orca-ide_${version}_${arch}.${ext}',
+    packageName: 'yoha',
+    artifactName: 'yoha_${version}_${arch}.${ext}',
     // Why: xvfb lets the bundled `orca serve` CLI run browser panes on a headless
     // Linux host — Chromium needs a display server even for offscreen rendering,
     // and serve starts Xvfb itself when present (see ensure-virtual-display.ts).
@@ -370,8 +377,8 @@ module.exports = {
     afterRemove: 'resources/linux/packaging/after-remove.sh'
   },
   rpm: {
-    packageName: 'orca-ide',
-    artifactName: 'orca-ide-${version}.${arch}.${ext}',
+    packageName: 'yoha',
+    artifactName: 'yoha-${version}.${arch}.${ext}',
     // Why: see deb depends. RPM distros ship Xvfb as xorg-x11-server-Xvfb (there
     // is no `xvfb` package), so the name differs from the deb here.
     depends: [

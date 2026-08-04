@@ -1,5 +1,5 @@
 #!/bin/bash
-# Why: register the bundled `orca-ide` CLI on PATH at package-install time.
+# Why: register the bundled CLI on PATH at package-install time.
 # The in-app "Install CLI" action (CliInstaller) can never run on a headless
 # server, so without this symlink `orca serve` is unreachable from the shell on
 # the exact hosts that need it most. deb/rpm both run this after unpacking.
@@ -9,9 +9,13 @@
 # because electron-builder's directory name can vary by productName sanitization.
 set -e
 
-link="/usr/bin/orca-ide"
+# Why `yoha` and not `orca-ide`: an installed upstream Orca deb owns
+# /usr/bin/orca-ide. Using a distinct name lets both packages coexist.
+link="/usr/bin/yoha"
 
-for dir in /opt/Orca /opt/orca-ide /opt/orca; do
+# Search this product's install dirs. electron-builder derives the directory
+# from productName, so keep this list in sync with it.
+for dir in /opt/Yoha /opt/yoha; do
   sandbox="$dir/chrome-sandbox"
   if [ -f "$sandbox" ]; then
     # Why: packaged Linux installs must leave Chromium's sandbox helper usable
@@ -21,7 +25,7 @@ for dir in /opt/Orca /opt/orca-ide /opt/orca; do
 
   shim="$dir/resources/bin/orca-ide"
   if [ -x "$shim" ]; then
-    # Only manage our own symlink; never clobber an unrelated /usr/bin/orca-ide.
+    # Only manage our own symlink; never clobber an unrelated /usr/bin/yoha.
     if [ ! -e "$link" ] || [ -L "$link" ]; then
       ln -sf "$shim" "$link"
     fi

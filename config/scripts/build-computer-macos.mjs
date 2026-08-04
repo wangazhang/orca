@@ -14,7 +14,11 @@ const entitlementsPath = path.join(
   'build',
   'entitlements.computer-use.mac.plist'
 )
-const bundleId = process.env.ORCA_COMPUTER_MACOS_BUNDLE_ID ?? 'com.stablyai.orca.computer-use'
+// Why this must track appId in config/electron-builder.config.cjs: macOS
+// attaches TCC (screen recording, accessibility) grants to this helper's code
+// identity. Sharing upstream's id would entangle this build's permission
+// grants with an installed upstream Orca's.
+const bundleId = process.env.ORCA_COMPUTER_MACOS_BUNDLE_ID ?? 'com.wangazhang.yoha.computer-use'
 const displayName = 'Orca Computer Use'
 const signingIdentity = resolveSigningIdentity()
 const universalTriples = ['arm64-apple-macosx', 'x86_64-apple-macosx']

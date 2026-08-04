@@ -10,7 +10,9 @@ import type {
   ComputerUsePermissionStatusResult
 } from '../../shared/computer-use-permissions-types'
 
-const DEFAULT_COMPUTER_USE_BUNDLE_ID = 'com.stablyai.orca.computer-use'
+// Must match the helper bundle id in config/scripts/build-computer-macos.mjs:
+// macOS attaches TCC grants (screen recording, accessibility) to that identity.
+const DEFAULT_COMPUTER_USE_BUNDLE_ID = 'com.wangazhang.yoha.computer-use'
 
 export { getComputerUsePermissionStatus } from './macos-computer-use-permission-status'
 

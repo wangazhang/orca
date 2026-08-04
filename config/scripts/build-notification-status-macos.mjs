@@ -28,7 +28,11 @@ if (process.platform !== 'darwin') {
 }
 
 const args = process.argv.slice(2)
-const bundleId = readArg('--bundle-id') ?? 'com.stablyai.orca'
+// Why this must match appId in config/electron-builder.config.cjs: macOS keys
+// notification records to the code-signing identifier derived from this value.
+// Leaving upstream's id here would file this build's notifications under an
+// installed upstream Orca's identity.
+const bundleId = readArg('--bundle-id') ?? 'com.wangazhang.yoha'
 const outputPath = readArg('--output') ?? defaultOutputPath
 // Why: dev launches only need the host architecture; release builds ship a
 // universal binary matching the app's x64 + arm64 targets.

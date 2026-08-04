@@ -2,8 +2,14 @@ import { createHash } from 'node:crypto'
 import path from 'node:path'
 import type { AppIdentity } from '../../shared/app-identity'
 
-const BASE_APP_NAME = 'Orca'
-const BASE_APP_USER_MODEL_ID = 'com.stablyai.orca'
+// Why this fork does not reuse upstream's name/appId: they decide the macOS
+// bundle identity, the install path, and — via app.setName — the userData
+// directory. Sharing them makes this build and an installed upstream Orca the
+// same application to the OS: they overwrite each other in /Applications and
+// read the same config and terminal history. Distinct values let both be
+// installed side by side, each with its own state.
+const BASE_APP_NAME = 'Yoha'
+const BASE_APP_USER_MODEL_ID = 'com.wangazhang.yoha'
 const MAX_LABEL_LENGTH = 80
 
 export type DevInstanceIdentity = AppIdentity & {

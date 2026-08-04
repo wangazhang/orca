@@ -20,10 +20,23 @@ import type { CliInstallMethod, CliInstallStatus } from '../../shared/cli-instal
 import { buildAppImageCliWrapper } from './appimage-cli-wrapper'
 
 const execFileAsync = promisify(execFile)
-const DEFAULT_MAC_COMMAND_PATH = '/usr/local/bin/orca'
-const DEV_COMMAND_NAME = 'orca-dev'
-const LINUX_COMMAND_NAME = 'orca-ide'
+// Why `yoha` and not `orca`: an installed upstream Orca owns /usr/local/bin/orca
+// (a symlink into its own app bundle). Registering the same name would replace
+// that symlink and silently repoint the user's existing `orca` command at this
+// build. A distinct command lets both CLIs coexist.
+const MAC_COMMAND_NAME = 'yoha'
+const DEFAULT_MAC_COMMAND_PATH = `/usr/local/bin/${MAC_COMMAND_NAME}`
+const DEV_COMMAND_NAME = 'yoha-dev'
+const LINUX_COMMAND_NAME = 'yoha'
 const LEGACY_LINUX_COMMAND_NAME = 'orca'
+// Why these are separate from the command names above: the launcher scripts
+// shipped inside the app bundle keep their upstream filenames (see
+// extraResources in config/electron-builder.config.cjs). Those live in our own
+// bundle and collide with nothing, so only the name registered on the user's
+// PATH needed to change. Conflating the two made the Linux lookup search for a
+// bundled file that is not there.
+const BUNDLED_MAC_LAUNCHER_NAME = 'orca'
+const BUNDLED_LINUX_LAUNCHER_NAME = 'orca-ide'
 const DEV_LAUNCHER_DIR = ['cli', 'bin']
 const WINDOWS_PATH_COMMAND_TIMEOUT_MS = 5_000
 
@@ -74,8 +87,7 @@ export class CliInstaller {
       // Why: development builds must not claim the production shell command.
       return DEV_COMMAND_NAME
     }
-    // Why: packaged Linux uses `orca-ide` to avoid shadowing GNOME Orca's /usr/bin/orca.
-    return this.platform === 'linux' ? LINUX_COMMAND_NAME : 'orca'
+    return this.platform === 'linux' ? LINUX_COMMAND_NAME : MAC_COMMAND_NAME
   }
 
   constructor(options: CliInstallerOptions = {}) {
@@ -103,7 +115,7 @@ export class CliInstaller {
     const candidateMacPath = options.defaultMacCommandPath ?? DEFAULT_MAC_COMMAND_PATH
     this.macCommandPath = existsSync(dirname(candidateMacPath))
       ? candidateMacPath
-      : join(this.homePath, '.local', 'bin', 'orca')
+      : join(this.homePath, '.local', 'bin', MAC_COMMAND_NAME)
     this.privilegedRunner = options.privilegedRunner ?? runMacPrivilegedCommand
     this.userPathReader = options.userPathReader ?? (() => readWindowsUserPath())
     this.userPathWriter = options.userPathWriter ?? ((value) => writeWindowsUserPath(value))
@@ -645,7 +657,13 @@ export class CliInstaller {
     resolvedTarget: string,
     packagedLauncherName: string
   ): boolean {
-    if (![packagedLauncherName, DEV_COMMAND_NAME].includes(basename(resolvedTarget))) {
+    // Why MAC_COMMAND_NAME is in this set: dev installs also drop a plain
+    // `yoha` alias next to `yoha-dev` (see writeLauncher), and a packaged
+    // install must recognize that alias as its own stale dev launcher rather
+    // than an unrelated binary it must not touch.
+    if (
+      ![packagedLauncherName, DEV_COMMAND_NAME, MAC_COMMAND_NAME].includes(basename(resolvedTarget))
+    ) {
       return false
     }
 
@@ -902,9 +920,11 @@ async function ensureDevLauncher(args: {
   })
   if (args.commandName === DEV_COMMAND_NAME && args.platform !== 'win32') {
     // Why: dev PTYs prepend userData/cli/bin to PATH, and product-owned
-    // commands are documented as `orca ...`. Keep that local alias fresh
-    // without claiming the global production command.
-    await writeFile(join(dirname(launcherPath), 'orca'), content, {
+    // commands are documented as `yoha ...`. Keep that local alias fresh
+    // without claiming the global production command. Note this must not be
+    // named `orca`, or a dev terminal would shadow an installed upstream Orca's
+    // CLI for the length of the session.
+    await writeFile(join(dirname(launcherPath), MAC_COMMAND_NAME), content, {
       encoding: 'utf8',
       mode: 0o755
     })
@@ -1179,10 +1199,10 @@ export function getBundledLauncherPath(
   resourcesPath: string
 ): string | null {
   if (platform === 'darwin') {
-    return join(resourcesPath, 'bin', 'orca')
+    return join(resourcesPath, 'bin', BUNDLED_MAC_LAUNCHER_NAME)
   }
   if (platform === 'linux') {
-    return join(resourcesPath, 'bin', LINUX_COMMAND_NAME)
+    return join(resourcesPath, 'bin', BUNDLED_LINUX_LAUNCHER_NAME)
   }
   if (platform === 'win32') {
     return join(resourcesPath, 'bin', 'orca.exe')
