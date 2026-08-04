@@ -106,6 +106,17 @@ describe('electron-builder config', () => {
     )
   })
 
+  // Why this is a gate: electron-builder's productName only sets CFBundleName in
+  // Info.plist. Electron resolves the runtime app name — and therefore
+  // app.getPath('userData') and the single-instance lock namespace — from
+  // package.json, preferring productName over name. With productName missing,
+  // a build named "Yoha" in Finder still ran as "orca": it shared userData with
+  // an installed upstream Orca and launching it just focused that app's window.
+  it('declares productName in package.json so the runtime app name matches the bundle', () => {
+    const pkg = require('../../package.json')
+    expect(pkg.productName).toBe(electronBuilderConfig.productName)
+  })
+
   it('uses the multi-size icon source for Linux packages', () => {
     expect(electronBuilderConfig.linux.icon).toBe('resources/build/icon.icns')
   })
