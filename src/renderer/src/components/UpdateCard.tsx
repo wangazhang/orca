@@ -26,6 +26,7 @@ import {
 } from '../../../shared/updater-windows-signature-check'
 import { releaseTagUrl } from '../../../shared/update-feed-origin'
 import { isManualInstallRequiredFailure } from '../../../shared/updater-manual-install'
+import { APP_DISPLAY_NAME } from '../../../shared/app-identity'
 import { translate } from '@/i18n/i18n'
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -390,7 +391,8 @@ export function UpdateCard() {
             ),
             summary: translate(
               'auto.components.UpdateCard.manualInstallSummary',
-              'This build cannot update itself. Download the new version and replace Orca in Applications.'
+              'This build cannot update itself. Download the new version and replace {{value0}} in Applications.',
+              { value0: APP_DISPLAY_NAME }
             ),
             releaseUrl: releaseUrlForVersion(cachedVersion),
             primaryAction: {
@@ -878,7 +880,8 @@ function SimpleCardContent({
           ? translate('auto.components.UpdateCard.fdd4a364fa', "Sessions won't be interrupted.")
           : translate(
               'auto.components.UpdateCard.manualInstallHint',
-              'This build installs manually: download it, replace Orca in Applications, then reopen. On first launch, right-click the app and choose Open.'
+              'This build installs manually: download it, replace {{value0}} in Applications, then reopen. On first launch, right-click the app and choose Open.',
+              { value0: APP_DISPLAY_NAME }
             )}
       </p>
 

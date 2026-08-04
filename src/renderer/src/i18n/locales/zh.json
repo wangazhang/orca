@@ -1854,9 +1854,9 @@
         "5194358929": "Hide details",
         "8bc9e17d8f": "Show details",
         "manualInstallTitle": "需要手动安装",
-        "manualInstallSummary": "此版本无法自动更新。请下载新版本并替换「应用程序」中的 Orca。",
+        "manualInstallSummary": "此版本无法自动更新。请下载新版本并替换「应用程序」中的 {{value0}}。",
         "manualDownload": "下载更新",
-        "manualInstallHint": "此版本需手动安装：下载后替换「应用程序」中的 Orca，再重新打开。首次启动请右键点按应用并选择「打开」。"
+        "manualInstallHint": "此版本需手动安装：下载后替换「应用程序」中的 {{value0}}，再重新打开。首次启动请右键点按应用并选择「打开」。"
       },
       "WorktreeJumpPalette": {
         "ac037cfac2": "手机",
@@ -9350,7 +9350,7 @@
         "license": {
           "title": "许可证",
           "valid": "许可证有效期至 {{value0}}。",
-          "grace": "已于 {{value0}} 到期。Orca 正处于宽限期，请尽快续期。",
+          "grace": "已于 {{value0}} 到期。{{value1}} 正处于宽限期，请尽快续期。",
           "expired": "已于 {{value0}} 到期。",
           "mismatch": "此许可证属于另一台电脑。",
           "invalid": "无法验证已保存的许可证。",
@@ -13379,12 +13379,12 @@
         "gateExpiredTitle": "许可证已过期",
         "gateMismatchTitle": "许可证签发给了另一台电脑",
         "gateInvalidTitle": "无法验证许可证",
-        "gateMissingTitle": "激活 Orca",
+        "gateMissingTitle": "激活 {{value0}}",
         "gateExpiredBody": "宽限期已结束。请输入续期后的许可证密钥以继续使用。",
         "gateMismatchBody": "此许可证绑定的是另一个机器 ID。请用下方的 ID 重新申请许可证。",
         "gateInvalidBody": "无法验证已保存的许可证密钥。重新输入同一密钥无济于事，请重新申请。",
-        "gateMissingBody": "请输入你收到的许可证密钥以开始使用 Orca。",
-        "bannerGrace": "许可证已过期。Orca 还可继续使用 {{value0}} 天，请尽快续期。",
+        "gateMissingBody": "请输入你收到的许可证密钥以开始使用 {{value0}}。",
+        "bannerGrace": "许可证已过期。{{value1}} 还可继续使用 {{value0}} 天，请尽快续期。",
         "bannerExpiring": "许可证将在 {{value0}} 天后到期。"
       }
     },

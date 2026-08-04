@@ -5,6 +5,7 @@ import { useAppStore } from '../store'
 import { UpdateCard } from './UpdateCard'
 import { MANUAL_INSTALL_REQUIRED_MESSAGE } from '../../../shared/updater-manual-install'
 import { UPDATE_RELEASES_URL } from '../../../shared/update-feed-origin'
+import { APP_DISPLAY_NAME } from '../../../shared/app-identity'
 
 const openUrl = vi.fn()
 const download = vi.fn()
@@ -76,7 +77,8 @@ describe('UpdateCard on a build that cannot install in place', () => {
     await act(async () => {})
 
     expect(screen.queryByText(/Sessions won't be interrupted/)).toBeNull()
-    expect(screen.getByText(/replace Orca in Applications/)).toBeTruthy()
+    // Asserts the product name comes from APP_DISPLAY_NAME, not a literal.
+    expect(screen.getByText(new RegExp(`replace ${APP_DISPLAY_NAME} in Applications`))).toBeTruthy()
   })
 
   it('keeps the in-place update path when the platform supports it', async () => {

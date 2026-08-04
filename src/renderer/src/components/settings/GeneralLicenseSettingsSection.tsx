@@ -2,6 +2,7 @@ import { SettingsSubsectionHeader } from './SettingsFormControls'
 import { LicenseActivationForm } from '../license/LicenseActivationForm'
 import { useLicenseStatus } from '../license/useLicenseStatus'
 import { translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '../../../../shared/app-identity'
 
 /**
  * License section in Settings: shows the current term and lets the user paste a
@@ -37,8 +38,8 @@ function summaryFor(state: string, expiresAt: number | null): string {
   if (state === 'grace') {
     return translate(
       'auto.components.settings.license.grace',
-      'Expired on {{value0}}. Orca is running on its grace period — please renew.',
-      { value0: date }
+      'Expired on {{value0}}. {{value1}} is running on its grace period — please renew.',
+      { value0: date, value1: APP_DISPLAY_NAME }
     )
   }
   if (state === 'expired') {

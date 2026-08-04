@@ -3,6 +3,7 @@ import { translate } from '@/i18n/i18n'
 import { ShieldAlert } from 'lucide-react'
 import { LicenseActivationForm } from './LicenseActivationForm'
 import type { LicenseStatus } from '../../../../shared/license-state'
+import { APP_DISPLAY_NAME } from '../../../../shared/app-identity'
 
 /**
  * Full-screen block shown when the license is expired, invalid, missing, or
@@ -55,7 +56,9 @@ function gateTitle(status: LicenseStatus): string {
   if (status.state === 'invalid') {
     return translate('auto.components.license.gateInvalidTitle', 'License could not be verified')
   }
-  return translate('auto.components.license.gateMissingTitle', 'Activate Orca')
+  return translate('auto.components.license.gateMissingTitle', 'Activate {{value0}}', {
+    value0: APP_DISPLAY_NAME
+  })
 }
 
 function gateDescription(status: LicenseStatus): string {
@@ -79,6 +82,7 @@ function gateDescription(status: LicenseStatus): string {
   }
   return translate(
     'auto.components.license.gateMissingBody',
-    'Enter the license key you were given to start using Orca.'
+    'Enter the license key you were given to start using {{value0}}.',
+    { value0: APP_DISPLAY_NAME }
   )
 }

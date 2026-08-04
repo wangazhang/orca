@@ -1,6 +1,7 @@
 import { translate } from '@/i18n/i18n'
 import { AlertCircle } from 'lucide-react'
 import { GRACE_PERIOD_DAYS, type LicenseStatus } from '../../../../shared/license-state'
+import { APP_DISPLAY_NAME } from '../../../../shared/app-identity'
 
 /**
  * Thin strip warning that the license is close to expiry or already inside its
@@ -33,8 +34,8 @@ export function LicenseStatusBanner({
         {inGrace
           ? translate(
               'auto.components.license.bannerGrace',
-              'Your license expired. Orca keeps working for {{value0}} more day(s) — please renew.',
-              { value0: String(graceDaysLeft) }
+              'Your license expired. {{value1}} keeps working for {{value0}} more day(s) — please renew.',
+              { value0: String(graceDaysLeft), value1: APP_DISPLAY_NAME }
             )
           : translate(
               'auto.components.license.bannerExpiring',

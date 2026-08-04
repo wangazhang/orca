@@ -32,7 +32,7 @@ const {
 })
 
 vi.mock('electron', () => ({
-  app: { on: vi.fn(), removeListener: vi.fn() },
+  app: { on: vi.fn(), removeListener: vi.fn(), getName: () => 'Yoha' },
   BrowserWindow: browserWindowMock,
   ipcMain: { on: vi.fn(), removeListener: vi.fn(), handle: vi.fn(), removeHandler: vi.fn() },
   Menu: { buildFromTemplate: buildFromTemplateMock },

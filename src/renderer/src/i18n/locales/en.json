@@ -1877,9 +1877,9 @@
         "5194358929": "Hide details",
         "8bc9e17d8f": "Show details",
         "manualInstallTitle": "Manual Install Required",
-        "manualInstallSummary": "This build cannot update itself. Download the new version and replace Orca in Applications.",
+        "manualInstallSummary": "This build cannot update itself. Download the new version and replace {{value0}} in Applications.",
         "manualDownload": "Download update",
-        "manualInstallHint": "This build installs manually: download it, replace Orca in Applications, then reopen. On first launch, right-click the app and choose Open."
+        "manualInstallHint": "This build installs manually: download it, replace {{value0}} in Applications, then reopen. On first launch, right-click the app and choose Open."
       },
       "WorktreeJumpPalette": {
         "ac037cfac2": "Move",
@@ -9373,7 +9373,7 @@
         "license": {
           "title": "License",
           "valid": "Licensed through {{value0}}.",
-          "grace": "Expired on {{value0}}. Orca is running on its grace period — please renew.",
+          "grace": "Expired on {{value0}}. {{value1}} is running on its grace period — please renew.",
           "expired": "Expired on {{value0}}.",
           "mismatch": "This license belongs to a different computer.",
           "invalid": "The stored license could not be verified.",
@@ -13402,12 +13402,12 @@
         "gateExpiredTitle": "Your license has expired",
         "gateMismatchTitle": "License issued for another computer",
         "gateInvalidTitle": "License could not be verified",
-        "gateMissingTitle": "Activate Orca",
+        "gateMissingTitle": "Activate {{value0}}",
         "gateExpiredBody": "The grace period has ended. Enter a renewed license key to continue.",
         "gateMismatchBody": "This license is bound to a different machine ID. Request a license for the ID below.",
         "gateInvalidBody": "The stored license key could not be verified. Re-entering the same key will not help — please request a new one.",
-        "gateMissingBody": "Enter the license key you were given to start using Orca.",
-        "bannerGrace": "Your license expired. Orca keeps working for {{value0}} more day(s) — please renew.",
+        "gateMissingBody": "Enter the license key you were given to start using {{value0}}.",
+        "bannerGrace": "Your license expired. {{value1}} keeps working for {{value0}} more day(s) — please renew.",
         "bannerExpiring": "Your license expires in {{value0}} day(s)."
       }
     },
